@@ -22,6 +22,25 @@ The preflight now checks:
 - configured region
 - read access to EC2, Auto Scaling, ELBv2, ECS, RDS, Secrets Manager, SSM, ACM, Route53, and IAM account summary
 - whether `g6e.2xlarge` is offered in the selected region
+- EC2 quota visibility for GPU families
+
+Optional deeper checks:
+
+```bash
+./scripts/aws-preflight.sh \
+  --region eu-north-1 \
+  --domain-name llm.example.com \
+  --route53-zone-id Z1234567890EXAMPLE \
+  --frontend-vpc-id vpc-frontend123 \
+  --backend-vpc-id vpc-backend123
+```
+
+This additionally checks:
+
+- hosted zone presence for the domain or zone ID
+- whether the frontend VPC has at least 2 public and 2 private subnets
+- whether the backend VPC has at least 2 private subnets
+- whether private subnets appear to have default egress via NAT, TGW, instance, peering, or ENI
 
 ## 2. Discover Existing VPC Inputs
 

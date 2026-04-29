@@ -75,7 +75,7 @@ This installs Terraform, Packer, AWS CLI v2, the Session Manager plugin, and com
 
 The repository now includes helper scripts for the most common AWS CLI tasks:
 
-- [scripts/aws-preflight.sh](/home/csandberg/projects/aws-llm-hosting/scripts/aws-preflight.sh): confirm local AWS tooling, active account, caller ARN, region, Session Manager plugin, service read access, and GPU instance-type availability
+- [scripts/aws-preflight.sh](/home/csandberg/projects/aws-llm-hosting/scripts/aws-preflight.sh): confirm local AWS tooling, active account, caller ARN, region, Session Manager plugin, service read access, GPU quota/instance availability, and optional domain/VPC readiness
 - [scripts/discover-vpc-details.sh](/home/csandberg/projects/aws-llm-hosting/scripts/discover-vpc-details.sh): inspect VPC subnets and route tables and infer public/private subnet roles
 - [scripts/generate-existing-vpc-tfvars.sh](/home/csandberg/projects/aws-llm-hosting/scripts/generate-existing-vpc-tfvars.sh): generate a starter `tfvars` file from existing frontend/backend VPCs
 - [scripts/create-litellm-secret.sh](/home/csandberg/projects/aws-llm-hosting/scripts/create-litellm-secret.sh): create or rotate a LiteLLM master key secret

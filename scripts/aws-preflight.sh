@@ -3,7 +3,9 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: aws-preflight.sh [--region REGION] [--profile PROFILE] [--instance-type TYPE]
+Usage: aws-preflight.sh [--region REGION] [--profile PROFILE] [--instance-type TYPE] \
+  [--domain-name DOMAIN] [--route53-zone-id ZONE_ID] \
+  [--frontend-vpc-id VPC_ID] [--backend-vpc-id VPC_ID]
 
 Checks AWS-related local and account prerequisites for this repository:
 
@@ -13,22 +15,34 @@ Checks AWS-related local and account prerequisites for this repository:
 - Session Manager plugin presence
 - read-only access to AWS services used by this repository
 - whether the target GPU instance type is offered in the target region
+- Route53 hosted zone presence for a supplied domain or zone ID
+- frontend/backend VPC subnet shape and routing sanity checks
+- EC2 service quota visibility for GPU families
 
 Examples:
   ./scripts/aws-preflight.sh --region eu-north-1
   ./scripts/aws-preflight.sh --profile prod-admin --region eu-north-1
+  ./scripts/aws-preflight.sh --region eu-north-1 --domain-name llm.example.com --frontend-vpc-id vpc-123 --backend-vpc-id vpc-456
 EOF
 }
 
 REGION=""
 PROFILE=""
 INSTANCE_TYPE="g6e.2xlarge"
+DOMAIN_NAME=""
+ROUTE53_ZONE_ID=""
+FRONTEND_VPC_ID=""
+BACKEND_VPC_ID=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --region) REGION="$2"; shift 2 ;;
     --profile) PROFILE="$2"; shift 2 ;;
     --instance-type) INSTANCE_TYPE="$2"; shift 2 ;;
+    --domain-name) DOMAIN_NAME="$2"; shift 2 ;;
+    --route53-zone-id) ROUTE53_ZONE_ID="$2"; shift 2 ;;
+    --frontend-vpc-id) FRONTEND_VPC_ID="$2"; shift 2 ;;
+    --backend-vpc-id) BACKEND_VPC_ID="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1"; usage; exit 1 ;;
   esac
@@ -46,6 +60,10 @@ PASS_COUNT=0
 WARN_COUNT=0
 FAIL_COUNT=0
 FAILURES=()
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TMP_STS_ERR="$(mktemp)"
+TMP_VPC_ERR="$(mktemp)"
+trap 'rm -f "${TMP_STS_ERR}" "${TMP_VPC_ERR}"' EXIT
 
 status_line() {
   local level="$1"
@@ -88,6 +106,15 @@ check_optional_cmd() {
   fi
 }
 
+check_script() {
+  local path="$1"
+  if [[ -x "${path}" ]]; then
+    pass "script:$(basename "${path}")" "executable"
+  else
+    fail "script:$(basename "${path}")" "missing or not executable"
+  fi
+}
+
 check_aws_call() {
   local label="$1"
   shift
@@ -114,11 +141,136 @@ check_aws_call_with_parse() {
   fi
 }
 
+check_hosted_zone() {
+  local domain="$1"
+  local zone_id="$2"
+  local output
+
+  if [[ -n "${zone_id}" ]]; then
+    if output="$(aws "${AWS_ARGS[@]}" route53 get-hosted-zone --id "${zone_id}" 2>&1)"; then
+      local zone_name
+      zone_name="$(jq -r '.HostedZone.Name' <<<"${output}")"
+      pass "route53:hosted-zone-id" "${zone_id} -> ${zone_name}"
+    else
+      fail "route53:hosted-zone-id" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+    fi
+  fi
+
+  if [[ -n "${domain}" ]]; then
+    local fqdn="${domain%.}."
+    if output="$(aws "${AWS_ARGS[@]}" route53 list-hosted-zones-by-name --dns-name "${domain}" --max-items 5 2>&1)"; then
+      if jq -e --arg fqdn "${fqdn}" '.HostedZones | any(.Name == $fqdn)' <<<"${output}" >/dev/null; then
+        pass "route53:domain-zone" "hosted zone exists for ${domain}"
+      else
+        warn "route53:domain-zone" "no exact hosted zone found for ${domain}"
+      fi
+    else
+      fail "route53:domain-zone" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+    fi
+  fi
+}
+
+check_quota_visibility() {
+  local output
+  if output="$(aws "${AWS_ARGS[@]}" service-quotas list-service-quotas --service-code ec2 --max-results 100 2>&1)"; then
+    pass "service-quotas:ec2" "visible"
+    local gpu_quota
+    gpu_quota="$(jq -r '.Quotas[] | select(.QuotaName | test("Running On-Demand G and VT instances")) | "\(.QuotaName)=\(.Value)"' <<<"${output}" | head -n 1)"
+    if [[ -n "${gpu_quota}" ]]; then
+      pass "quota:g-vt-on-demand" "${gpu_quota}"
+    else
+      warn "quota:g-vt-on-demand" "quota not found in first page of EC2 service quotas"
+    fi
+  else
+    warn "service-quotas:ec2" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fi
+}
+
+check_vpc_shape() {
+  local role="$1"
+  local vpc_id="$2"
+  local vpc_json
+  local common_args=()
+  local public_count
+  local private_count
+
+  [[ -n "${PROFILE}" ]] && common_args+=(--profile "${PROFILE}")
+  [[ -n "${ACTIVE_REGION}" ]] && common_args+=(--region "${ACTIVE_REGION}")
+
+  if ! vpc_json="$("${SCRIPT_DIR}/discover-vpc-details.sh" --vpc-id "${vpc_id}" "${common_args[@]}" 2>"${TMP_VPC_ERR}")"; then
+    fail "vpc:${role}" "$(tr '\n' ' ' <"${TMP_VPC_ERR}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+    return
+  fi
+
+  pass "vpc:${role}" "${vpc_id} inspected"
+
+  public_count="$(jq '.summary.public_subnet_ids | length' <<<"${vpc_json}")"
+  private_count="$(jq '.summary.private_subnet_ids | length' <<<"${vpc_json}")"
+
+  if [[ "${role}" == "frontend" ]]; then
+    if (( public_count >= 2 )); then
+      pass "vpc:${role}:public-subnets" "${public_count} public subnets"
+    else
+      fail "vpc:${role}:public-subnets" "need at least 2 public subnets, found ${public_count}"
+    fi
+
+    if (( private_count >= 2 )); then
+      pass "vpc:${role}:private-subnets" "${private_count} private subnets"
+    else
+      fail "vpc:${role}:private-subnets" "need at least 2 private subnets, found ${private_count}"
+    fi
+  else
+    if (( private_count >= 2 )); then
+      pass "vpc:${role}:private-subnets" "${private_count} private subnets"
+    else
+      fail "vpc:${role}:private-subnets" "need at least 2 private subnets, found ${private_count}"
+    fi
+
+    if (( public_count > 0 )); then
+      warn "vpc:${role}:public-subnets" "${public_count} public subnets exist; backend should use private subnets only"
+    else
+      pass "vpc:${role}:public-subnets" "no public subnets inferred"
+    fi
+  fi
+
+  local private_without_default
+  private_without_default="$(jq '
+    .route_tables as $rts
+    | [
+        .subnets[]
+        | select(.inferred_type == "private")
+        | .route_table_id as $rtid
+        | select(
+            any(
+              $rts[]?
+              | select(.route_table_id == $rtid)
+              | .routes[]?;
+              ((.DestinationCidrBlock // "") == "0.0.0.0/0") and
+              (
+                ((.NatGatewayId // "") != "") or
+                ((.TransitGatewayId // "") != "") or
+                ((.InstanceId // "") != "") or
+                ((.VpcPeeringConnectionId // "") != "") or
+                ((.NetworkInterfaceId // "") != "")
+              )
+            ) | not
+          )
+      ] | length
+  ' <<<"${vpc_json}")"
+
+  if [[ -n "${private_without_default}" && "${private_without_default}" != "0" ]]; then
+    warn "vpc:${role}:private-egress" "${private_without_default} private subnet(s) lack obvious default egress via NAT/TGW/instance/ENI"
+  else
+    pass "vpc:${role}:private-egress" "private subnets have an apparent default egress path"
+  fi
+}
+
 echo "AWS preflight checks"
 echo
 
 check_cmd aws
 check_cmd jq
+check_script "${SCRIPT_DIR}/discover-vpc-details.sh"
 check_optional_cmd session-manager-plugin
 check_optional_cmd terraform
 check_optional_cmd packer
@@ -143,9 +295,9 @@ else
   warn "session-manager-plugin" "required for aws ssm start-session"
 fi
 
-IDENTITY_JSON="$(aws "${AWS_ARGS[@]}" sts get-caller-identity 2>/tmp/aws-preflight-sts.err || true)"
+IDENTITY_JSON="$(aws "${AWS_ARGS[@]}" sts get-caller-identity 2>"${TMP_STS_ERR}" || true)"
 if [[ -z "${IDENTITY_JSON}" ]]; then
-  fail "sts:get-caller-identity" "$(tr '\n' ' ' </tmp/aws-preflight-sts.err | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fail "sts:get-caller-identity" "$(tr '\n' ' ' <"${TMP_STS_ERR}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
   echo
   echo "Preflight failed before AWS service checks."
   exit 1
@@ -189,6 +341,8 @@ check_aws_call "acm:list-certificates" acm list-certificates --max-items 5
 check_aws_call "route53:list-hosted-zones" route53 list-hosted-zones --max-items 5
 check_aws_call "iam:get-account-summary" iam get-account-summary
 
+check_quota_visibility
+
 INSTANCE_JSON="$(check_aws_call_with_parse "ec2:instance-type-offerings" "queried" ec2 describe-instance-type-offerings --location-type region --filters "Name=instance-type,Values=${INSTANCE_TYPE}" --output json || true)"
 if [[ -n "${INSTANCE_JSON}" ]]; then
   OFFER_COUNT="$(jq '.InstanceTypeOfferings | length' <<<"${INSTANCE_JSON}")"
@@ -197,6 +351,18 @@ if [[ -n "${INSTANCE_JSON}" ]]; then
   else
     warn "instance-type:${INSTANCE_TYPE}" "not returned for ${ACTIVE_REGION}"
   fi
+fi
+
+if [[ -n "${DOMAIN_NAME}" || -n "${ROUTE53_ZONE_ID}" ]]; then
+  check_hosted_zone "${DOMAIN_NAME}" "${ROUTE53_ZONE_ID}"
+fi
+
+if [[ -n "${FRONTEND_VPC_ID}" ]]; then
+  check_vpc_shape "frontend" "${FRONTEND_VPC_ID}"
+fi
+
+if [[ -n "${BACKEND_VPC_ID}" ]]; then
+  check_vpc_shape "backend" "${BACKEND_VPC_ID}"
 fi
 
 echo

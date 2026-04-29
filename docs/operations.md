@@ -60,7 +60,19 @@ This also checks the AWS-side prerequisites most operators need before Terraform
 - CLI auth and region
 - Session Manager plugin presence
 - read access to the services used by this repository
+- EC2 GPU quota visibility
 - whether `g6e.2xlarge` is available in-region
+
+For deeper environment checks:
+
+```bash
+./scripts/aws-preflight.sh \
+  --region eu-north-1 \
+  --domain-name llm.example.com \
+  --route53-zone-id Z1234567890EXAMPLE \
+  --frontend-vpc-id vpc-frontend123 \
+  --backend-vpc-id vpc-backend123
+```
 
 Inspect a VPC:
 
