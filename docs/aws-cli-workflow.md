@@ -42,6 +42,28 @@ This additionally checks:
 - whether the backend VPC has at least 2 private subnets
 - whether private subnets appear to have default egress via NAT, TGW, instance, peering, or ENI
 
+## 1a. Generate a Markdown Readiness Report
+
+```bash
+./scripts/aws-readiness-report.sh \
+  --region eu-north-1 \
+  --domain-name llm.example.com \
+  --route53-zone-id Z1234567890EXAMPLE \
+  --frontend-vpc-id vpc-frontend123 \
+  --backend-vpc-id vpc-backend123 \
+  --output docs/readiness-report.md
+```
+
+This produces a Markdown report with:
+
+- identity and scope summary
+- local tooling summary
+- AWS service reachability
+- region and GPU availability notes
+- hosted zone checks
+- per-VPC subnet tables
+- recommended next steps
+
 ## 2. Discover Existing VPC Inputs
 
 Inspect a single VPC:

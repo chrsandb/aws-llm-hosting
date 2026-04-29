@@ -79,6 +79,7 @@ The repository now includes helper scripts for the most common AWS CLI tasks:
 - [scripts/discover-vpc-details.sh](/home/csandberg/projects/aws-llm-hosting/scripts/discover-vpc-details.sh): inspect VPC subnets and route tables and infer public/private subnet roles
 - [scripts/generate-existing-vpc-tfvars.sh](/home/csandberg/projects/aws-llm-hosting/scripts/generate-existing-vpc-tfvars.sh): generate a starter `tfvars` file from existing frontend/backend VPCs
 - [scripts/create-litellm-secret.sh](/home/csandberg/projects/aws-llm-hosting/scripts/create-litellm-secret.sh): create or rotate a LiteLLM master key secret
+- [scripts/aws-readiness-report.sh](/home/csandberg/projects/aws-llm-hosting/scripts/aws-readiness-report.sh): generate a Markdown deployment-readiness report for a concrete domain/VPC setup
 
 Detailed runbook:
 

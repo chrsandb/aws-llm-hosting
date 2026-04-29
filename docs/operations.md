@@ -74,6 +74,18 @@ For deeper environment checks:
   --backend-vpc-id vpc-backend123
 ```
 
+Generate a shareable Markdown readiness report:
+
+```bash
+./scripts/aws-readiness-report.sh \
+  --region eu-north-1 \
+  --domain-name llm.example.com \
+  --route53-zone-id Z1234567890EXAMPLE \
+  --frontend-vpc-id vpc-frontend123 \
+  --backend-vpc-id vpc-backend123 \
+  --output docs/readiness-report.md
+```
+
 Inspect a VPC:
 
 ```bash
