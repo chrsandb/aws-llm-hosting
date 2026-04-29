@@ -13,6 +13,30 @@
 3. Start another instance refresh.
 4. Validate `/health` and a short completion request.
 
+## Cleanup
+
+Use the safe cleanup wrapper instead of a raw destroy when you want to remove the deployment:
+
+```bash
+./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
+```
+
+Key safeguards:
+
+- only destroys Terraform-managed resources in state
+- does not remove pre-existing VPCs, subnets, route tables, or hosted zones
+- refuses cleanup if Terraform state contains managed network resources, unless you pass `--allow-network-destroy`
+
+To also remove image artifacts created outside Terraform:
+
+```bash
+./scripts/cleanup-deployment.sh \
+  --tfvars examples/generated.prod.tfvars \
+  --delete-ami-id ami-0123456789abcdef0 \
+  --delete-snapshot-id snap-0123456789abcdef0 \
+  --force
+```
+
 ## LiteLLM Secrets
 
 Create a master key yourself if you do not want Terraform to generate it:

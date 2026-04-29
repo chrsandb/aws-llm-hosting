@@ -14,6 +14,7 @@ This repository provisions an AWS-hosted LLM platform with:
 
 - Keep infrastructure changes modular and environment-agnostic.
 - Prefer existing VPCs and subnets; do not introduce new networking by default.
+- Cleanup flows must default to deleting only Terraform-managed resources created by this repository and must not remove pre-existing VPCs, subnets, route tables, or hosted zones unless explicitly created and managed by this repository.
 - Keep backend instances private-only and reachable via SSM first.
 - Store secrets in AWS Secrets Manager or SSM Parameter Store only.
 - Route frontend traffic through LiteLLM; do not bypass the internal backend load balancer.

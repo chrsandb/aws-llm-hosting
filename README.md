@@ -226,6 +226,40 @@ Fastest rollback path:
 3. start a fresh ASG instance refresh
 4. confirm target health and a smoke test response
 
+## Cleanup and Destroy
+
+Yes. There is now a safe cleanup path for deleting what this repository created without removing pre-existing VPCs or other shared network resources.
+
+Default cleanup behavior:
+
+- destroys only Terraform-managed resources in this repository's state
+- does not remove existing VPCs, subnets, route tables, or hosted zones that were not created by this repository
+- refuses to proceed if Terraform state unexpectedly contains managed network resources, unless you explicitly override that safety check
+- does not delete Packer-built AMIs or manually created EBS snapshots unless you explicitly pass them to the cleanup script
+
+Terraform-only cleanup:
+
+```bash
+make cleanup TFVARS=examples/generated.prod.tfvars
+```
+
+Direct script usage:
+
+```bash
+./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
+```
+
+Cleanup including manually created image artifacts:
+
+```bash
+./scripts/cleanup-deployment.sh \
+  --tfvars examples/generated.prod.tfvars \
+  --delete-ami-id ami-0123456789abcdef0 \
+  --delete-snapshot-id snap-0123456789abcdef0
+```
+
+If you intentionally added Terraform-managed network resources and want them removed too, use `--allow-network-destroy`.
+
 ## LiteLLM Developer Keys and Admin Access
 
 - LiteLLM uses PostgreSQL for persistent users, keys, and budgets.
