@@ -3,11 +3,6 @@ output "api_base_url" {
   value       = "https://${var.domain_name}/v1"
 }
 
-output "anthropic_base_url" {
-  description = "Anthropic-compatible path routed to LiteLLM."
-  value       = "https://${var.domain_name}/anthropic"
-}
-
 output "frontend_public_alb_dns_name" {
   description = "Public ALB DNS name."
   value       = module.litellm_frontend.public_alb_dns_name

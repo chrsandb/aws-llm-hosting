@@ -34,9 +34,14 @@ flowchart LR
 Traffic flow:
 
 - Public clients use `https://<domain>/v1/*`.
-- Optional Anthropic-compatible requests can be routed through `https://<domain>/anthropic/*`.
 - LiteLLM Admin UI is exposed only via the internal admin ALB or restricted admin CIDRs.
 - Backend GPU instances are private-only and receive traffic only from the internal backend ALB.
+
+Public API contract:
+
+- `https://<domain>/v1/*` is the supported public contract.
+- Anthropic-native request shapes and paths are not guaranteed by this repository by default.
+- If you want Anthropic-native ingress later, treat it as an explicit compatibility feature and validate it against the deployed LiteLLM version before exposing it.
 
 ## Why This Design
 
@@ -106,6 +111,8 @@ make apply TFVARS=../examples/prod.tfvars
 ```bash
 curl https://your-domain.example/v1/models
 ```
+
+Use OpenAI-compatible clients against the public endpoint by default, even if LiteLLM is routing internally to non-OpenAI backends or provider adapters.
 
 ## Model Storage Strategy
 

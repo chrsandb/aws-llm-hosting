@@ -184,7 +184,7 @@ resource "aws_lb_listener_rule" "public_v1" {
 
   condition {
     path_pattern {
-      values = ["/v1/*", "/health*", "/anthropic/*"]
+      values = ["/v1/*", "/health*"]
     }
   }
 }
