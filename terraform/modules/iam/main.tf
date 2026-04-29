@@ -21,8 +21,8 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
 
 data "aws_iam_policy_document" "ecs_task_inline" {
   statement {
-    sid     = "AllowSecretsRead"
-    actions = ["secretsmanager:GetSecretValue", "ssm:GetParameter", "ssm:GetParameters"]
+    sid       = "AllowSecretsRead"
+    actions   = ["secretsmanager:GetSecretValue", "ssm:GetParameter", "ssm:GetParameters"]
     resources = ["*"]
   }
 }

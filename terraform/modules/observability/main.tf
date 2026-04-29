@@ -20,9 +20,9 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title   = "Public ALB Requests and Latency"
-          view    = "timeSeries"
-          region  = var.aws_region
+          title  = "Public ALB Requests and Latency"
+          view   = "timeSeries"
+          region = var.aws_region
           metrics = [
             ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", var.public_alb_arn_suffix],
             [".", "TargetResponseTime", ".", "."]
@@ -36,9 +36,9 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title   = "Backend ALB Latency"
-          view    = "timeSeries"
-          region  = var.aws_region
+          title  = "Backend ALB Latency"
+          view   = "timeSeries"
+          region = var.aws_region
           metrics = [
             ["AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", var.backend_alb_arn_suffix]
           ]
@@ -51,9 +51,9 @@ resource "aws_cloudwatch_dashboard" "main" {
         width  = 12
         height = 6
         properties = {
-          title   = "ASG CPU"
-          view    = "timeSeries"
-          region  = var.aws_region
+          title  = "ASG CPU"
+          view   = "timeSeries"
+          region = var.aws_region
           metrics = [
             ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", var.asg_name]
           ]

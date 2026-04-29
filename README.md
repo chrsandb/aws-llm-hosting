@@ -58,6 +58,14 @@ Traffic flow:
 - AWS CLI v2
 - Session Manager plugin if you want interactive SSM shells locally
 
+For recent Debian and Ubuntu operators, bootstrap the local toolchain with:
+
+```bash
+./scripts/install-dependencies-debian-ubuntu.sh
+```
+
+This installs Terraform, Packer, AWS CLI v2, the Session Manager plugin, and common helper tools using the HashiCorp APT repository plus AWS's official installers.
+
 ## Domain Registration and Hosted Zone
 
 Domain registration is intentionally not automated.

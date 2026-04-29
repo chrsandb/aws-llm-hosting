@@ -30,3 +30,19 @@ Use the internal admin ALB DNS name from Terraform outputs. Reach it through:
 - VPN
 - Direct Connect
 - peering or transit gateway routes from an internal admin network
+
+## Local Operator Dependencies
+
+On recent Debian or Ubuntu releases:
+
+```bash
+./scripts/install-dependencies-debian-ubuntu.sh
+```
+
+Installed tools:
+
+- Terraform
+- Packer
+- AWS CLI v2
+- Session Manager plugin
+- `jq`, `curl`, `unzip`, `git`, `make`, and APT prerequisites

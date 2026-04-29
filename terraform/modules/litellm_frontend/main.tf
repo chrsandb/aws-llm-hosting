@@ -29,8 +29,8 @@ resource "aws_secretsmanager_secret" "master_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "master_key" {
-  count      = var.create_litellm_master_key_secret ? 1 : 0
-  secret_id  = aws_secretsmanager_secret.master_key[0].id
+  count         = var.create_litellm_master_key_secret ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.master_key[0].id
   secret_string = random_password.master_key[0].result
 }
 
@@ -215,7 +215,7 @@ resource "aws_route53_record" "public_alias" {
 }
 
 locals {
-  redis_url    = var.enable_redis ? "redis://${aws_elasticache_replication_group.this[0].primary_endpoint_address}:6379/0" : ""
+  redis_url = var.enable_redis ? "redis://${aws_elasticache_replication_group.this[0].primary_endpoint_address}:6379/0" : ""
 
   litellm_bootstrap = <<-EOT
     cat >/tmp/config.yaml <<'CFG'
