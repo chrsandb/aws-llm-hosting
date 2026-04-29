@@ -5,23 +5,24 @@ locals {
 
   merged_llama_settings = merge(
     {
-      ctx_size         = 12288
-      parallel         = 2
-      n_gpu_layers     = 99
-      temp             = 0.5
-      top_p            = 0.90
-      top_k            = 40
-      min_p            = 0.03
-      reasoning_budget = 3072
-      host             = "0.0.0.0"
-      port             = 8080
-      batch_size       = 1024
-      ubatch_size      = 512
-      threads          = 8
-      no_mmap          = false
-      metrics          = true
-      flash_attn       = true
-      cont_batching    = true
+      ctx_size      = 262144
+      n_parallel    = 1
+      n_gpu_layers  = 99
+      temp          = 0.6
+      top_p         = 0.95
+      top_k         = 20
+      min_p         = 0.00
+      think_budget  = 2048
+      host          = "0.0.0.0"
+      port          = 8080
+      batch_size    = 1024
+      ubatch_size   = 512
+      threads       = 8
+      no_mmap       = false
+      metrics       = true
+      flash_attn    = true
+      cont_batching = true
+      jinja         = true
     },
     var.llama_cpp_settings,
   )

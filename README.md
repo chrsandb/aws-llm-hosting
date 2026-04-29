@@ -8,7 +8,7 @@ Production-oriented Infrastructure-as-Code repository for hosting a shared devel
 - ECS Fargate frontend
 - Internal backend ALB
 - Auto Scaling Group of private GPU instances
-- `llama.cpp` CUDA server for `unsloth/Qwen3.6-27B-GGUF:UD-Q6_K_XL`
+- `llama.cpp` CUDA server for `unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL`
 
 The default deployment target is `eu-north-1` and is sized for roughly 10 developers with a baseline of one `g6e.2xlarge` backend instance and configurable scale-out to 3 or higher.
 
@@ -134,25 +134,27 @@ Backend runtime settings live in `/etc/default/llama-server` on each GPU instanc
 - `LLAMA_ARG_MODEL`
 - `LLAMA_ARG_ALIAS`
 - `LLAMA_ARG_CTX_SIZE`
-- `LLAMA_ARG_PARALLEL`
+- `LLAMA_ARG_N_PARALLEL`
 - `LLAMA_ARG_N_GPU_LAYERS`
 - `LLAMA_ARG_TEMP`
 - `LLAMA_ARG_TOP_P`
 - `LLAMA_ARG_TOP_K`
 - `LLAMA_ARG_MIN_P`
-- `LLAMA_ARG_REASONING_BUDGET`
+- `LLAMA_ARG_THINK_BUDGET`
+- `LLAMA_ARG_JINJA`
 - `LLAMA_ARG_HOST`
 - `LLAMA_ARG_PORT`
 
 Tradeoffs:
 
-- `parallel = 1`: best per-request latency and highest safety margin for long reasoning prompts
-- `parallel = 2`: balanced default for about 10 developers when concurrency is moderate
-- `parallel = 4`: better throughput, but increased VRAM pressure and more contention
+- `n_parallel = 1`: best fit for this larger model and longest context setting on a single `g6e.2xlarge`
+- `n_parallel = 2`: only after careful throughput and VRAM validation
+- `n_parallel = 4`: generally not recommended for this default model on the default instance type
 - larger `ctx-size`: more context per request, but lower throughput and more memory pressure
-- higher `reasoning-budget`: better deeper reasoning behavior, but longer tail latency
+- higher `think-budget`: better deeper reasoning behavior, but longer tail latency
+- `jinja = enabled`: preferred default for this model family unless a prompt template issue forces it off
 
-Default recommendations for `Qwen3.6-27B UD-Q6_K_XL` on `g6e.2xlarge` are baked into `examples/` and can be overridden via `llama_cpp_settings`.
+Default recommendations for `Qwen3.6-35B-A3B UD-Q6_K_XL` on `g6e.2xlarge` are baked into `examples/` and can be overridden via `llama_cpp_settings`.
 
 ## Switching Models
 
@@ -281,6 +283,6 @@ Recommended extras:
   - confirm the model path exists and the EBS snapshot was attached correctly
 - slow responses:
   - reduce `LLAMA_ARG_CTX_SIZE`
-  - reduce `LLAMA_ARG_REASONING_BUDGET`
-  - lower `LLAMA_ARG_PARALLEL`
+  - reduce `LLAMA_ARG_THINK_BUDGET`
+  - keep `LLAMA_ARG_N_PARALLEL=1` unless you have validated higher concurrency for your prompts
   - scale out the ASG

@@ -35,13 +35,13 @@ LLAMA_CPP_IMAGE_TAG=${llama_cpp_image_tag}
 LLAMA_ARG_MODEL=${model_path}
 LLAMA_ARG_ALIAS=${model_alias}
 LLAMA_ARG_CTX_SIZE=${llama_settings.ctx_size}
-LLAMA_ARG_PARALLEL=${llama_settings.parallel}
+LLAMA_ARG_N_PARALLEL=${llama_settings.n_parallel}
 LLAMA_ARG_N_GPU_LAYERS=${llama_settings.n_gpu_layers}
 LLAMA_ARG_TEMP=${llama_settings.temp}
 LLAMA_ARG_TOP_P=${llama_settings.top_p}
 LLAMA_ARG_TOP_K=${llama_settings.top_k}
 LLAMA_ARG_MIN_P=${llama_settings.min_p}
-LLAMA_ARG_REASONING_BUDGET=${llama_settings.reasoning_budget}
+LLAMA_ARG_THINK_BUDGET=${llama_settings.think_budget}
 LLAMA_ARG_HOST=${llama_settings.host}
 LLAMA_ARG_PORT=${llama_settings.port}
 LLAMA_ARG_BATCH_SIZE=${llama_settings.batch_size}
@@ -51,6 +51,7 @@ LLAMA_ARG_NO_MMAP=${llama_settings.no_mmap}
 LLAMA_ARG_METRICS=${llama_settings.metrics}
 LLAMA_ARG_FLASH_ATTN=${llama_settings.flash_attn}
 LLAMA_ARG_CONT_BATCHING=${llama_settings.cont_batching}
+LLAMA_ARG_JINJA=${llama_settings.jinja ? "enabled" : "disabled"}
 EOF
 
 systemctl daemon-reload

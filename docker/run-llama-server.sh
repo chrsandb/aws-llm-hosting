@@ -23,6 +23,10 @@ if [[ "${LLAMA_ARG_CONT_BATCHING:-true}" == "true" ]]; then
   BOOL_ARGS+=("--cont-batching")
 fi
 
+if [[ "${LLAMA_ARG_JINJA:-enabled}" == "enabled" ]]; then
+  BOOL_ARGS+=("--jinja")
+fi
+
 exec /usr/bin/docker run --rm \
   --name llama-server \
   --gpus all \
@@ -36,13 +40,13 @@ exec /usr/bin/docker run --rm \
   --model "${LLAMA_ARG_MODEL}" \
   --alias "${LLAMA_ARG_ALIAS}" \
   --ctx-size "${LLAMA_ARG_CTX_SIZE}" \
-  --parallel "${LLAMA_ARG_PARALLEL}" \
+  --parallel "${LLAMA_ARG_N_PARALLEL}" \
   --n-gpu-layers "${LLAMA_ARG_N_GPU_LAYERS}" \
   --temp "${LLAMA_ARG_TEMP}" \
   --top-p "${LLAMA_ARG_TOP_P}" \
   --top-k "${LLAMA_ARG_TOP_K}" \
   --min-p "${LLAMA_ARG_MIN_P}" \
-  --reasoning-budget "${LLAMA_ARG_REASONING_BUDGET}" \
+  --reasoning-budget "${LLAMA_ARG_THINK_BUDGET}" \
   --host "${LLAMA_ARG_HOST}" \
   --port "${LLAMA_ARG_PORT}" \
   --batch-size "${LLAMA_ARG_BATCH_SIZE}" \

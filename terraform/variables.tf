@@ -116,7 +116,7 @@ variable "backend_ami_id" {
 variable "model_repo" {
   description = "Model repository identifier."
   type        = string
-  default     = "unsloth/Qwen3.6-27B-GGUF"
+  default     = "unsloth/Qwen3.6-35B-A3B-GGUF"
 }
 
 variable "model_filename" {
@@ -128,7 +128,7 @@ variable "model_filename" {
 variable "model_alias" {
   description = "Friendly model alias exposed through LiteLLM."
   type        = string
-  default     = "qwen3.6-27b"
+  default     = "qwen3.6-35b-a3b"
 }
 
 variable "model_path" {
@@ -169,23 +169,24 @@ variable "llama_cpp_image_tag" {
 variable "llama_cpp_settings" {
   description = "Runtime settings passed to /etc/default/llama-server."
   type = object({
-    ctx_size         = optional(number, 12288)
-    parallel         = optional(number, 2)
-    n_gpu_layers     = optional(number, 99)
-    temp             = optional(number, 0.5)
-    top_p            = optional(number, 0.90)
-    top_k            = optional(number, 40)
-    min_p            = optional(number, 0.03)
-    reasoning_budget = optional(number, 3072)
-    host             = optional(string, "0.0.0.0")
-    port             = optional(number, 8080)
-    batch_size       = optional(number, 1024)
-    ubatch_size      = optional(number, 512)
-    threads          = optional(number, 8)
-    no_mmap          = optional(bool, false)
-    metrics          = optional(bool, true)
-    flash_attn       = optional(bool, true)
-    cont_batching    = optional(bool, true)
+    ctx_size      = optional(number, 262144)
+    n_parallel    = optional(number, 1)
+    n_gpu_layers  = optional(number, 99)
+    temp          = optional(number, 0.6)
+    top_p         = optional(number, 0.95)
+    top_k         = optional(number, 20)
+    min_p         = optional(number, 0.00)
+    think_budget  = optional(number, 2048)
+    host          = optional(string, "0.0.0.0")
+    port          = optional(number, 8080)
+    batch_size    = optional(number, 1024)
+    ubatch_size   = optional(number, 512)
+    threads       = optional(number, 8)
+    no_mmap       = optional(bool, false)
+    metrics       = optional(bool, true)
+    flash_attn    = optional(bool, true)
+    cont_batching = optional(bool, true)
+    jinja         = optional(bool, true)
   })
   default = {}
 }
