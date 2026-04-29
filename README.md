@@ -71,6 +71,19 @@ For recent Debian and Ubuntu operators, bootstrap the local toolchain with:
 
 This installs Terraform, Packer, AWS CLI v2, the Session Manager plugin, and common helper tools using the HashiCorp APT repository plus AWS's official installers.
 
+## AWS CLI Workflow
+
+The repository now includes helper scripts for the most common AWS CLI tasks:
+
+- [scripts/aws-preflight.sh](/home/csandberg/projects/aws-llm-hosting/scripts/aws-preflight.sh): confirm active account, caller ARN, region, and profile
+- [scripts/discover-vpc-details.sh](/home/csandberg/projects/aws-llm-hosting/scripts/discover-vpc-details.sh): inspect VPC subnets and route tables and infer public/private subnet roles
+- [scripts/generate-existing-vpc-tfvars.sh](/home/csandberg/projects/aws-llm-hosting/scripts/generate-existing-vpc-tfvars.sh): generate a starter `tfvars` file from existing frontend/backend VPCs
+- [scripts/create-litellm-secret.sh](/home/csandberg/projects/aws-llm-hosting/scripts/create-litellm-secret.sh): create or rotate a LiteLLM master key secret
+
+Detailed runbook:
+
+- [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md)
+
 ## Domain Registration and Hosted Zone
 
 Domain registration is intentionally not automated.
@@ -88,25 +101,29 @@ Domain registration is intentionally not automated.
 
 ## First Deployment
 
-1. Build the backend AMI or prepare the model EBS snapshot.
+1. Confirm AWS CLI access and region selection.
+   - `./scripts/aws-preflight.sh --region eu-north-1`
+2. Build the backend AMI or prepare the model EBS snapshot.
    - for Packer, start from [packer/backend.example.pkrvars.hcl](/home/csandberg/projects/aws-llm-hosting/packer/backend.example.pkrvars.hcl)
-2. Copy one of the example `tfvars` files and fill in your VPC, subnet, and domain values.
-3. Create required secrets:
-   - LiteLLM master key
+3. Discover or generate the existing-VPC inputs.
+   - inspect a VPC with `./scripts/discover-vpc-details.sh --region eu-north-1 --vpc-id vpc-... | jq`
+   - generate a starter tfvars file with `./scripts/generate-existing-vpc-tfvars.sh ... > examples/generated.prod.tfvars`
+4. Create required secrets:
+   - LiteLLM master key with `./scripts/create-litellm-secret.sh --region eu-north-1 --name llm-hosting/prod/litellm-master-key`
    - PostgreSQL password if you want to preseed it
-4. Run:
+5. Run:
 
 ```bash
 make init
-make plan TFVARS=../examples/prod.tfvars
-make apply TFVARS=../examples/prod.tfvars
+make plan TFVARS=../examples/generated.prod.tfvars
+make apply TFVARS=../examples/generated.prod.tfvars
 ```
 
-5. Wait for:
+6. Wait for:
    - ACM validation to complete
    - ECS service to stabilize
    - backend ASG instances to pass the internal ALB health check
-6. Test:
+7. Test:
 
 ```bash
 curl https://your-domain.example/v1/models
@@ -124,6 +141,7 @@ Preferred order:
 
 Runbooks:
 
+- [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md)
 - [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md)
 - [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md)
 

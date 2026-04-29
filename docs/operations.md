@@ -47,6 +47,40 @@ Installed tools:
 - Session Manager plugin
 - `jq`, `curl`, `unzip`, `git`, `make`, and APT prerequisites
 
+## AWS CLI Helpers
+
+Confirm identity:
+
+```bash
+./scripts/aws-preflight.sh --region eu-north-1
+```
+
+Inspect a VPC:
+
+```bash
+./scripts/discover-vpc-details.sh --region eu-north-1 --vpc-id vpc-0123456789abcdef0 | jq
+```
+
+Generate starter tfvars:
+
+```bash
+./scripts/generate-existing-vpc-tfvars.sh \
+  --region eu-north-1 \
+  --frontend-vpc-id vpc-frontend123 \
+  --backend-vpc-id vpc-backend123 \
+  --project-name llm-hosting \
+  --environment prod \
+  --domain-name llm.example.com > examples/generated.prod.tfvars
+```
+
+Create or rotate the LiteLLM master key:
+
+```bash
+./scripts/create-litellm-secret.sh \
+  --region eu-north-1 \
+  --name llm-hosting/prod/litellm-master-key
+```
+
 ## Packer Validation
 
 ```bash
