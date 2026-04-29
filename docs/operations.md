@@ -55,6 +55,13 @@ Confirm identity:
 ./scripts/aws-preflight.sh --region eu-north-1
 ```
 
+This also checks the AWS-side prerequisites most operators need before Terraform:
+
+- CLI auth and region
+- Session Manager plugin presence
+- read access to the services used by this repository
+- whether `g6e.2xlarge` is available in-region
+
 Inspect a VPC:
 
 ```bash

@@ -13,6 +13,16 @@ Optional:
 - add `--profile your-profile`
 - set `AWS_PROFILE=your-profile`
 
+The preflight now checks:
+
+- `aws` and `jq`
+- optional but recommended `session-manager-plugin`
+- optional local `terraform` and `packer`
+- AWS CLI authentication via `sts get-caller-identity`
+- configured region
+- read access to EC2, Auto Scaling, ELBv2, ECS, RDS, Secrets Manager, SSM, ACM, Route53, and IAM account summary
+- whether `g6e.2xlarge` is offered in the selected region
+
 ## 2. Discover Existing VPC Inputs
 
 Inspect a single VPC:
