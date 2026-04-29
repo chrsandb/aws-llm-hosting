@@ -1,0 +1,59 @@
+#!/bin/bash
+set -euxo pipefail
+
+exec > >(tee /var/log/llm-bootstrap.log | logger -t llm-bootstrap -s 2>/dev/console) 2>&1
+
+mkdir -p /etc/default /opt/llama-server /models
+
+if [ "${model_source}" = "ebs_snapshot" ]; then
+  mkdir -p /models
+  if ! mountpoint -q /models; then
+    DEVICE="/dev/nvme1n1"
+    if [ ! -b "$DEVICE" ]; then
+      DEVICE="$(readlink -f /dev/sdf || true)"
+    fi
+    mount "$DEVICE" /models
+  fi
+fi
+
+if [ "${model_source}" = "download" ]; then
+  mkdir -p /models
+  if [ ! -f "${model_path}" ]; then
+    apt-get update
+    apt-get install -y python3-pip git
+    python3 -m pip install --break-system-packages "huggingface_hub[cli]"
+    huggingface-cli download "${model_repo}" "${model_filename}" --local-dir /models
+  fi
+fi
+
+cat >/etc/default/llama-server <<'EOF'
+MODEL_SOURCE=${model_source}
+MODEL_REPO=${model_repo}
+MODEL_FILENAME=${model_filename}
+LLAMA_CPP_IMAGE=${llama_cpp_image}
+LLAMA_CPP_IMAGE_TAG=${llama_cpp_image_tag}
+LLAMA_ARG_MODEL=${model_path}
+LLAMA_ARG_ALIAS=${model_alias}
+LLAMA_ARG_CTX_SIZE=${llama_settings.ctx_size}
+LLAMA_ARG_PARALLEL=${llama_settings.parallel}
+LLAMA_ARG_N_GPU_LAYERS=${llama_settings.n_gpu_layers}
+LLAMA_ARG_TEMP=${llama_settings.temp}
+LLAMA_ARG_TOP_P=${llama_settings.top_p}
+LLAMA_ARG_TOP_K=${llama_settings.top_k}
+LLAMA_ARG_MIN_P=${llama_settings.min_p}
+LLAMA_ARG_REASONING_BUDGET=${llama_settings.reasoning_budget}
+LLAMA_ARG_HOST=${llama_settings.host}
+LLAMA_ARG_PORT=${llama_settings.port}
+LLAMA_ARG_BATCH_SIZE=${llama_settings.batch_size}
+LLAMA_ARG_UBATCH_SIZE=${llama_settings.ubatch_size}
+LLAMA_ARG_THREADS=${llama_settings.threads}
+LLAMA_ARG_NO_MMAP=${llama_settings.no_mmap}
+LLAMA_ARG_METRICS=${llama_settings.metrics}
+LLAMA_ARG_FLASH_ATTN=${llama_settings.flash_attn}
+LLAMA_ARG_CONT_BATCHING=${llama_settings.cont_batching}
+EOF
+
+systemctl daemon-reload
+systemctl enable llama-server.service
+systemctl restart llama-server.service
+systemctl restart amazon-cloudwatch-agent.service || true

@@ -1,0 +1,26 @@
+name: backend-rollout
+
+on:
+  workflow_dispatch:
+    inputs:
+      asg_name:
+        description: "Backend Auto Scaling Group name"
+        required: true
+      aws_region:
+        description: "AWS region"
+        required: true
+        default: "eu-north-1"
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+      - run: ./scripts/start-instance-refresh.sh "${{ inputs.asg_name }}" "${{ inputs.aws_region }}"
