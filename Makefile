@@ -3,7 +3,7 @@ SHELL := /bin/bash
 TF_DIR ?= terraform
 PACKER_DIR ?= packer
 TFVARS ?= ../examples/dev.tfvars
-PACKER_VARS ?= backend.auto.pkrvars.hcl
+PACKER_VARS ?= backend.example.pkrvars.hcl
 
 define require_cmd
 	@command -v $(1) >/dev/null 2>&1 || { echo "Missing required command: $(1). Run ./scripts/install-dependencies-debian-ubuntu.sh or install it manually."; exit 1; }
@@ -37,7 +37,7 @@ validate:
 	$(call require_cmd,terraform)
 	cd $(TF_DIR) && terraform validate
 	$(call require_cmd,packer)
-	packer validate -syntax-only $(PACKER_DIR)/backend-ami.pkr.hcl
+	packer validate -var-file=$(PACKER_DIR)/$(PACKER_VARS) $(PACKER_DIR)/backend-ami.pkr.hcl
 
 packer-init:
 	$(call require_cmd,packer)

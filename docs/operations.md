@@ -46,3 +46,11 @@ Installed tools:
 - AWS CLI v2
 - Session Manager plugin
 - `jq`, `curl`, `unzip`, `git`, `make`, and APT prerequisites
+
+## Packer Validation
+
+```bash
+cp packer/backend.example.pkrvars.hcl packer/backend.auto.pkrvars.hcl
+packer init packer/backend-ami.pkr.hcl
+packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
+```

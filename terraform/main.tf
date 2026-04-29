@@ -25,7 +25,10 @@ module "dns_acm" {
 module "iam" {
   source = "./modules/iam"
 
-  name_prefix = local.name_prefix
+  name_prefix    = local.name_prefix
+  aws_region     = var.aws_region
+  aws_partition  = data.aws_partition.current.partition
+  aws_account_id = data.aws_caller_identity.current.account_id
 }
 
 module "security_groups" {
@@ -132,4 +135,5 @@ module "observability" {
   ecs_cluster_name               = module.litellm_frontend.ecs_cluster_name
   ecs_service_name               = module.litellm_frontend.ecs_service_name
   asg_name                       = module.backend_asg.asg_name
+  asg_min_size                   = var.asg_min_size
 }

@@ -66,11 +66,11 @@ variable "model_local_path" {
 }
 
 source "amazon-ebs" "backend" {
-  ami_name      = "${var.ami_name_prefix}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
-  instance_type = var.instance_type
-  region        = var.aws_region
-  ssh_username  = var.ssh_username
-  subnet_id     = var.subnet_id
+  ami_name          = "${var.ami_name_prefix}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+  instance_type     = var.instance_type
+  region            = var.aws_region
+  ssh_username      = var.ssh_username
+  subnet_id         = var.subnet_id
   security_group_id = var.security_group_id
 
   source_ami = var.source_ami_id
@@ -94,11 +94,11 @@ source "amazon-ebs" "backend" {
   }
 
   tags = {
-    Name       = "${var.ami_name_prefix}-backend"
-    ImageRole  = "llama-backend"
-    ManagedBy  = "packer"
-    ModelMode  = var.model_source
-    LlamaTag   = var.llama_cpp_image_tag
+    Name      = "${var.ami_name_prefix}-backend"
+    ImageRole = "llama-backend"
+    ManagedBy = "packer"
+    ModelMode = var.model_source
+    LlamaTag  = var.llama_cpp_image_tag
   }
 }
 

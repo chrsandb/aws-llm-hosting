@@ -78,6 +78,51 @@ resource "aws_cloudwatch_metric_alarm" "public_5xx" {
   }
 }
 
+resource "aws_cloudwatch_metric_alarm" "public_4xx" {
+  alarm_name          = "${var.name_prefix}-public-4xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "HTTPCode_ELB_4XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 50
+  alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
+  dimensions = {
+    LoadBalancer = var.public_alb_arn_suffix
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "public_latency" {
+  alarm_name          = "${var.name_prefix}-public-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "TargetResponseTime"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 20
+  alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
+  dimensions = {
+    LoadBalancer = var.public_alb_arn_suffix
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "backend_latency" {
+  alarm_name          = "${var.name_prefix}-backend-latency"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "TargetResponseTime"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 15
+  alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
+  dimensions = {
+    LoadBalancer = var.backend_alb_arn_suffix
+  }
+}
+
 resource "aws_cloudwatch_metric_alarm" "backend_unhealthy" {
   alarm_name          = "${var.name_prefix}-backend-unhealthy"
   comparison_operator = "GreaterThanThreshold"
@@ -101,7 +146,37 @@ resource "aws_cloudwatch_metric_alarm" "asg_in_service" {
   namespace           = "AWS/AutoScaling"
   period              = 60
   statistic           = "Average"
-  threshold           = 1
+  threshold           = var.asg_min_size
+  alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
+  dimensions = {
+    AutoScalingGroupName = var.asg_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "gpu_memory_high" {
+  alarm_name          = "${var.name_prefix}-gpu-memory-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "nvidia_smi_utilization_memory"
+  namespace           = "CWAgent"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 92
+  alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
+  dimensions = {
+    AutoScalingGroupName = var.asg_name
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "gpu_utilization_sustained" {
+  alarm_name          = "${var.name_prefix}-gpu-utilization-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 5
+  metric_name         = "nvidia_smi_utilization_gpu"
+  namespace           = "CWAgent"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 85
   alarm_actions       = var.cloudwatch_alarm_sns_topic_arn == null ? [] : [var.cloudwatch_alarm_sns_topic_arn]
   dimensions = {
     AutoScalingGroupName = var.asg_name

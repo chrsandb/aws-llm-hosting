@@ -121,3 +121,52 @@ resource "aws_autoscaling_policy" "target_cpu" {
     target_value = 70
   }
 }
+
+resource "aws_autoscaling_policy" "target_gpu_utilization" {
+  name                   = "${var.name_prefix}-gpu-utilization"
+  autoscaling_group_name = aws_autoscaling_group.this.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    customized_metric_specification {
+      metric_name = "nvidia_smi_utilization_gpu"
+      namespace   = "CWAgent"
+      statistic   = "Average"
+
+      metric_dimension {
+        name  = "AutoScalingGroupName"
+        value = aws_autoscaling_group.this.name
+      }
+    }
+
+    target_value = 70
+  }
+}
+
+resource "aws_autoscaling_policy" "step_backend_latency" {
+  name                   = "${var.name_prefix}-backend-latency-step"
+  autoscaling_group_name = aws_autoscaling_group.this.name
+  adjustment_type        = "ChangeInCapacity"
+  policy_type            = "StepScaling"
+  cooldown               = 300
+
+  step_adjustment {
+    metric_interval_lower_bound = 0
+    scaling_adjustment          = 1
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "backend_latency_high" {
+  alarm_name          = "${var.name_prefix}-backend-latency-high"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 3
+  metric_name         = "TargetResponseTime"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Average"
+  threshold           = 15
+  alarm_actions       = [aws_autoscaling_policy.step_backend_latency.arn]
+  dimensions = {
+    LoadBalancer = var.backend_alb_arn_suffix
+  }
+}

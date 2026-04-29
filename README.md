@@ -84,6 +84,7 @@ Domain registration is intentionally not automated.
 ## First Deployment
 
 1. Build the backend AMI or prepare the model EBS snapshot.
+   - for Packer, start from [packer/backend.example.pkrvars.hcl](/home/csandberg/projects/aws-llm-hosting/packer/backend.example.pkrvars.hcl)
 2. Copy one of the example `tfvars` files and fill in your VPC, subnet, and domain values.
 3. Create required secrets:
    - LiteLLM master key
@@ -244,6 +245,14 @@ Included:
 ```bash
 make fmt
 make validate
+```
+
+For a standalone AMI validation/build flow:
+
+```bash
+cp packer/backend.example.pkrvars.hcl packer/backend.auto.pkrvars.hcl
+make packer-init
+make packer-build
 ```
 
 Recommended extras:

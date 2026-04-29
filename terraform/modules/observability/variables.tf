@@ -30,3 +30,7 @@ variable "ecs_service_name" {
 variable "asg_name" {
   type = string
 }
+
+variable "asg_min_size" {
+  type = number
+}
