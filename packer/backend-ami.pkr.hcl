@@ -67,11 +67,36 @@ variable "model_local_path" {
 
 source "amazon-ebs" "backend" {
   ami_name          = "${var.ami_name_prefix}-${formatdate("YYYYMMDDhhmmss", timestamp())}"
+  communicator      = "ssh"
   instance_type     = var.instance_type
   region            = var.aws_region
   ssh_username      = var.ssh_username
+  ssh_interface     = "session_manager"
+  pause_before_ssm  = "20s"
   subnet_id         = var.subnet_id
   security_group_id = var.security_group_id
+
+  temporary_iam_instance_profile_policy_document {
+    Version = "2012-10-17"
+
+    Statement {
+      Effect = "Allow"
+      Action = [
+        "ssm:UpdateInstanceInformation",
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel",
+        "ec2messages:AcknowledgeMessage",
+        "ec2messages:DeleteMessage",
+        "ec2messages:FailMessage",
+        "ec2messages:GetEndpoint",
+        "ec2messages:GetMessages",
+        "ec2messages:SendReply"
+      ]
+      Resource = ["*"]
+    }
+  }
 
   source_ami = var.source_ami_id
 

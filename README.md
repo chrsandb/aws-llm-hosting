@@ -219,16 +219,32 @@ More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 Purpose: create the GPU-ready backend image with Docker, NVIDIA runtime, systemd units, and CloudWatch agent installed.
 
-Start from the example variables file:
+Prepare the Packer build inputs from the Terraform file you generated earlier:
 
 ```bash
-cp packer/backend.example.pkrvars.hcl packer/backend.auto.pkrvars.hcl
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+
 make packer-init
 packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
-make packer-build
+make packer-build PACKER_VARS=backend.auto.pkrvars.hcl
 ```
 
-Success signal: Packer outputs a new AMI ID and writes `packer/manifest.json`.
+This helper:
+
+- picks the first subnet from `backend_private_subnet_ids` for `subnet_id`
+- creates a temporary security group in `backend_vpc_id` for `security_group_id`
+- writes `packer/backend.auto.pkrvars.hcl`
+
+Important:
+
+- the Packer build now connects through AWS Session Manager, so the temporary security group does not need inbound SSH
+- the chosen backend private subnet still needs outbound access to SSM and package repositories, either through NAT or the required VPC endpoints
+- if you want to use a different backend private subnet, pass `--subnet-id subnet-...`
+
+Success signal: the helper prints a security group ID and Packer vars file path, then Packer outputs a new AMI ID and writes `packer/manifest.json`.
 
 ### 9. Create the model snapshot
 

@@ -124,7 +124,19 @@ Optional SSH remains disabled by default. Enable it only when required by settin
 ## Packer Validation
 
 ```bash
-cp packer/backend.example.pkrvars.hcl packer/backend.auto.pkrvars.hcl
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+
 packer init packer/backend-ami.pkr.hcl
 packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
+packer build -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
 ```
+
+Notes:
+
+- the helper selects a backend private subnet from `backend_private_subnet_ids`
+- it creates a temporary security group in `backend_vpc_id`
+- the Packer template connects through AWS Session Manager, so the temporary security group does not need inbound SSH
+- the selected backend private subnet still needs outbound access to SSM and package repositories

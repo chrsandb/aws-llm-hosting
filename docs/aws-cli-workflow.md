@@ -126,8 +126,8 @@ Interpret the DNS and VPC findings like this:
 
 Review the generated file and then fill in:
 
-- `backend_ami_id`
-- `model_ebs_snapshot_id`
+- `backend_ami_id` after step 7
+- `model_ebs_snapshot_id` after step 8
 - admin CIDRs
 - any overrides for frontend count or llama settings
 
@@ -144,7 +144,40 @@ If you use this script, set:
 - `create_litellm_master_key_secret = false`
 - `existing_litellm_master_key_secret_arn = "arn:..."`
 
-## 7. Model Snapshot Preparation
+## 7. Prepare and Build the Backend AMI
+
+The generated tfvars file already contains the backend VPC and backend private subnet list. Use that file to prepare the Packer inputs:
+
+```bash
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+```
+
+This helper:
+
+- reads `backend_vpc_id`
+- picks the first subnet from `backend_private_subnet_ids`
+- creates a temporary security group for the Packer build instance
+- writes `packer/backend.auto.pkrvars.hcl`
+
+Then run:
+
+```bash
+make packer-init
+packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
+make packer-build PACKER_VARS=backend.auto.pkrvars.hcl
+```
+
+Important:
+
+- the Packer template uses AWS Session Manager for provisioning
+- you do not need inbound SSH on the temporary build security group
+- the selected backend private subnet still needs outbound access to SSM and package repositories, either through NAT or the required VPC endpoints
+- if you want a different backend private subnet, pass `--subnet-id`
+
+## 8. Model Snapshot Preparation
 
 Create the initial EBS volume:
 
@@ -161,7 +194,7 @@ Then copy the GGUF file onto the mounted volume and snapshot it with:
 ./scripts/update-model-snapshot.sh vol-0123456789abcdef0 "qwen3.6-35b-a3b initial snapshot" eu-north-1
 ```
 
-## 8. Run Terraform
+## 9. Run Terraform
 
 ```bash
 make init
@@ -169,7 +202,7 @@ make plan TFVARS=examples/generated.prod.tfvars
 make apply TFVARS=examples/generated.prod.tfvars
 ```
 
-## 9. Post-Deploy Checks
+## 10. Post-Deploy Checks
 
 Check backend health:
 
