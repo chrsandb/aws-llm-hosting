@@ -73,6 +73,10 @@ Success state for the next steps:
 - you know the domain name
 - you know the hosted zone ID, or you know you will set `create_route53_zone = true`
 
+If you are new to Route53, follow:
+
+- [route53-domain-setup.md](route53-domain-setup.md)
+
 ## 4. Generate a Markdown Readiness Report
 
 ```bash

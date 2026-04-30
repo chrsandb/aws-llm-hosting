@@ -151,6 +151,10 @@ Success signal: the domain exists, and either:
 - you know the target `route53_zone_id`, or
 - you plan to set `create_route53_zone = true`
 
+Detailed guide for first-time Route53 users:
+
+- [docs/route53-domain-setup.md](docs/route53-domain-setup.md)
+
 ### 5. Generate a readiness report
 
 Purpose: create a shareable Markdown summary of AWS access, DNS readiness, and VPC shape.
