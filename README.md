@@ -145,6 +145,7 @@ Manual steps:
 1. Register the domain in Route53 Domains or another registrar.
 2. If `create_route53_zone = true`, Terraform will create the public hosted zone.
 3. If the domain is registered outside AWS, update the registrar name servers after the hosted zone exists.
+4. Do not manually create the final app host record such as `llm.example.com`. Terraform creates that Route53 alias record for `domain_name` and points it at the public ALB.
 
 Success signal: the domain exists, and either:
 
@@ -170,6 +171,11 @@ Purpose: create a shareable Markdown summary of AWS access, DNS readiness, and V
 ```
 
 Success signal: the script writes `docs/readiness-report.md`.
+
+Important notes when reading the report:
+
+- A warning like `no exact hosted zone found for llm.example.com` is expected if your hosted zone is the parent domain such as `example.com`. Terraform will create the final `llm.example.com` record later.
+- A warning about backend public subnets is informational in a shared-VPC design. It is safe as long as `backend_private_subnet_ids` only reference private subnets and the backend instances do not receive public IPs.
 
 ### 6. Generate a starter tfvars file
 

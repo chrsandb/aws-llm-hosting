@@ -42,6 +42,11 @@ This additionally checks:
 - whether the backend VPC has at least 2 private subnets
 - whether private subnets appear to have default egress via NAT, TGW, instance, peering, or ENI
 
+Notes about the warnings:
+
+- if `domain_name` is a subdomain such as `llm.example.com`, a warning about no exact hosted zone is often harmless when the real hosted zone is the parent domain such as `example.com`
+- if frontend and backend share a VPC, a warning about backend public subnets is informational as long as `backend_private_subnet_ids` only reference private subnets
+
 ## 2. Discover Existing VPC Inputs
 
 Inspect a single VPC:
@@ -72,6 +77,7 @@ Success state for the next steps:
 
 - you know the domain name
 - you know the hosted zone ID, or you know you will set `create_route53_zone = true`
+- you understand that Terraform creates the final `domain_name` DNS record and you do not need to add it manually
 
 If you are new to Route53, follow:
 
@@ -98,6 +104,12 @@ This produces a Markdown report with:
 - hosted zone checks
 - per-VPC subnet tables
 - recommended next steps
+
+Interpret the DNS and VPC findings like this:
+
+- `Hosted zone ID -> example.com.` is the important signal that Terraform knows which zone to use
+- `no exact hosted zone found for llm.example.com` is normal when `llm.example.com` will be created later as a record inside the `example.com` zone
+- `backend should remain private-only` is a reminder about subnet selection, not a requirement that the whole VPC contain zero public subnets
 
 ## 5. Generate a Starter tfvars File
 

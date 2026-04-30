@@ -11,6 +11,12 @@ For this repository, you need two things:
 1. A domain name that users will call, for example `llm.example.com`
 2. A Route53 public hosted zone that Terraform can use for ACM DNS validation and the public API DNS record
 
+Important:
+
+- the hosted zone is usually for the parent domain, such as `example.com`
+- the application hostname can be a subdomain, such as `llm.example.com`
+- you do not manually create the final `llm.example.com` record for this repo; Terraform creates it and points it at the public ALB
+
 There are two common paths:
 
 - register a new domain in Route53 Domains
@@ -26,8 +32,14 @@ There are two common paths:
 Why this matters for this repo:
 
 - Terraform needs a Route53 hosted zone to create ACM DNS validation records
-- the public API endpoint will live in that hosted zone
+- the public API endpoint will live as a record inside that hosted zone
 - if the domain is registered outside AWS, you usually need to update the registrar to use the Route53 name servers
+
+Example:
+
+- hosted zone: `example.com`
+- application hostname: `llm.example.com`
+- Terraform creates the `llm.example.com` alias record in the `example.com` hosted zone
 
 ## Option 1: Register a New Domain in Route53 Domains
 
@@ -160,6 +172,12 @@ create_route53_zone = false
 route53_zone_id     = "Z1234567890EXAMPLE"
 ```
 
+In this example:
+
+- the hosted zone might be `example.com`
+- `domain_name` is still `llm.example.com`
+- Terraform creates the final `llm.example.com` record in the `example.com` zone
+
 If Terraform should create the hosted zone:
 
 ```hcl
@@ -174,6 +192,8 @@ route53_zone_id     = null
 - setting `create_route53_zone = true` when Route53 Domains already created one for you
 - forgetting to update external registrar name servers to Route53
 - using the wrong hosted zone ID for the chosen domain
+- expecting a separate hosted zone for `llm.example.com` when the real hosted zone is `example.com`
+- manually creating the final app host record even though Terraform manages it
 - expecting ACM validation to work before DNS delegation is correct
 
 ## How to Verify You Are Ready
