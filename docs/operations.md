@@ -1,10 +1,16 @@
 # Operations
 
-## Start an ASG Refresh
+This runbook owns post-deploy operations. Use it after the platform has already been created.
+
+## Roll Backend Instances
+
+Start an ASG refresh:
 
 ```bash
 ./scripts/start-instance-refresh.sh llm-hosting-prod-backend eu-north-1
 ```
+
+You can also roll instances by changing launch template inputs and re-running Terraform.
 
 ## Rollback
 
@@ -37,6 +43,44 @@ To also remove image artifacts created outside Terraform:
   --force
 ```
 
+## Upgrade llama.cpp
+
+1. Update `llama_cpp_image` or `llama_cpp_image_tag` in your `tfvars`.
+2. Run:
+
+```bash
+make plan TFVARS=examples/generated.prod.tfvars
+make apply TFVARS=examples/generated.prod.tfvars
+```
+
+3. Refresh the backend ASG if required:
+
+```bash
+./scripts/start-instance-refresh.sh llm-hosting-prod-backend eu-north-1
+```
+
+4. Validate backend health and a small public `/v1` request.
+
+## Change llama.cpp Settings
+
+Adjust `llama_cpp_settings` in your deployment `tfvars`, then apply Terraform.
+
+Important runtime settings include:
+
+- `ctx_size`
+- `n_parallel`
+- `n_gpu_layers`
+- `temp`
+- `top_p`
+- `top_k`
+- `min_p`
+- `think_budget`
+- `jinja`
+
+Recommended operational rule:
+
+- keep `n_parallel = 1` unless you have validated higher concurrency for your workload
+
 ## LiteLLM Secrets
 
 Create a master key yourself if you do not want Terraform to generate it:
@@ -47,6 +91,14 @@ aws secretsmanager create-secret \
   --secret-string "$(openssl rand -hex 32)"
 ```
 
+To rotate using the helper:
+
+```bash
+./scripts/create-litellm-secret.sh \
+  --region eu-north-1 \
+  --name llm-hosting/prod/litellm-master-key
+```
+
 ## Internal Admin Access
 
 Use the internal admin ALB DNS name from Terraform outputs. Reach it through:
@@ -55,86 +107,19 @@ Use the internal admin ALB DNS name from Terraform outputs. Reach it through:
 - Direct Connect
 - peering or transit gateway routes from an internal admin network
 
-## Local Operator Dependencies
+## Access Methods
 
-On recent Debian or Ubuntu releases:
-
-```bash
-./scripts/install-dependencies-debian-ubuntu.sh
-```
-
-Installed tools:
-
-- Terraform
-- Packer
-- AWS CLI v2
-- Session Manager plugin
-- `jq`, `curl`, `unzip`, `git`, `make`, and APT prerequisites
-
-## AWS CLI Helpers
-
-Confirm identity:
+Preferred access method:
 
 ```bash
-./scripts/aws-preflight.sh --region eu-north-1
+aws ssm start-session --target i-0123456789abcdef0
 ```
 
-This also checks the AWS-side prerequisites most operators need before Terraform:
+Optional SSH remains disabled by default. Enable it only when required by setting:
 
-- CLI auth and region
-- Session Manager plugin presence
-- read access to the services used by this repository
-- EC2 GPU quota visibility
-- whether `g6e.2xlarge` is available in-region
-
-For deeper environment checks:
-
-```bash
-./scripts/aws-preflight.sh \
-  --region eu-north-1 \
-  --domain-name llm.example.com \
-  --route53-zone-id Z1234567890EXAMPLE \
-  --frontend-vpc-id vpc-frontend123 \
-  --backend-vpc-id vpc-backend123
-```
-
-Generate a shareable Markdown readiness report:
-
-```bash
-./scripts/aws-readiness-report.sh \
-  --region eu-north-1 \
-  --domain-name llm.example.com \
-  --route53-zone-id Z1234567890EXAMPLE \
-  --frontend-vpc-id vpc-frontend123 \
-  --backend-vpc-id vpc-backend123 \
-  --output docs/readiness-report.md
-```
-
-Inspect a VPC:
-
-```bash
-./scripts/discover-vpc-details.sh --region eu-north-1 --vpc-id vpc-0123456789abcdef0 | jq
-```
-
-Generate starter tfvars:
-
-```bash
-./scripts/generate-existing-vpc-tfvars.sh \
-  --region eu-north-1 \
-  --frontend-vpc-id vpc-frontend123 \
-  --backend-vpc-id vpc-backend123 \
-  --project-name llm-hosting \
-  --environment prod \
-  --domain-name llm.example.com > examples/generated.prod.tfvars
-```
-
-Create or rotate the LiteLLM master key:
-
-```bash
-./scripts/create-litellm-secret.sh \
-  --region eu-north-1 \
-  --name llm-hosting/prod/litellm-master-key
-```
+- `enable_ssh_access = true`
+- `ssh_key_name`
+- `ssh_allowed_cidrs`
 
 ## Packer Validation
 

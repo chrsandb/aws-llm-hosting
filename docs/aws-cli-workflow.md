@@ -134,8 +134,8 @@ Then copy the GGUF file onto the mounted volume and snapshot it with:
 
 ```bash
 make init
-make plan TFVARS=../examples/generated.prod.tfvars
-make apply TFVARS=../examples/generated.prod.tfvars
+make plan TFVARS=examples/generated.prod.tfvars
+make apply TFVARS=examples/generated.prod.tfvars
 ```
 
 ## 7. Post-Deploy Checks
