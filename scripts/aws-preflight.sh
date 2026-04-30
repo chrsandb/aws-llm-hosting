@@ -172,14 +172,21 @@ check_hosted_zone() {
 
 check_quota_visibility() {
   local output
-  if output="$(aws "${AWS_ARGS[@]}" service-quotas list-service-quotas --service-code ec2 --max-results 100 2>&1)"; then
+  if output="$(aws "${AWS_ARGS[@]}" service-quotas list-service-quotas --service-code ec2 2>&1)"; then
     pass "service-quotas:ec2" "visible"
     local gpu_quota
-    gpu_quota="$(jq -r '.Quotas[] | select(.QuotaName | test("Running On-Demand G and VT instances")) | "\(.QuotaName)=\(.Value)"' <<<"${output}" | head -n 1)"
+    gpu_quota="$(jq -r '
+      .Quotas[]
+      | select(
+          .QuotaName
+          | test("Running On-Demand G and VT instances|Running On-Demand G instances|Running On-Demand.*GPU"; "i")
+        )
+      | "\(.QuotaName)=\(.Value)"
+    ' <<<"${output}" | head -n 1)"
     if [[ -n "${gpu_quota}" ]]; then
       pass "quota:g-vt-on-demand" "${gpu_quota}"
     else
-      warn "quota:g-vt-on-demand" "quota not found in first page of EC2 service quotas"
+      warn "quota:g-vt-on-demand" "no matching GPU quota name found in EC2 service quotas; review Service Quotas manually if needed"
     fi
   else
     warn "service-quotas:ec2" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
@@ -337,7 +344,7 @@ check_aws_call "ec2:route-tables" ec2 describe-route-tables --max-items 5
 check_aws_call "autoscaling:account-limits" autoscaling describe-account-limits
 check_aws_call "elbv2:account-limits" elbv2 describe-account-limits
 check_aws_call "ecs:list-clusters" ecs list-clusters --max-results 5
-check_aws_call "rds:describe-db-instances" rds describe-db-instances --max-records 5
+check_aws_call "rds:describe-db-instances" rds describe-db-instances --max-records 20
 check_aws_call "secretsmanager:list-secrets" secretsmanager list-secrets --max-results 5
 check_aws_call "ssm:describe-parameters" ssm describe-parameters --max-results 5
 check_aws_call "acm:list-certificates" acm list-certificates --max-items 5
