@@ -45,7 +45,7 @@ Core assumptions:
 - SSM Session Manager is the default access path
 - model assets are prepared outside Terraform and then attached or referenced
 
-For deeper design rationale and network assumptions, see [docs/architecture.md](/home/csandberg/projects/aws-llm-hosting/docs/architecture.md).
+For deeper design rationale and network assumptions, see [docs/architecture.md](docs/architecture.md).
 
 ## Before You Start
 
@@ -74,7 +74,7 @@ Check AWS access:
 ./scripts/aws-preflight.sh --region eu-north-1
 ```
 
-For detailed AWS discovery, readiness, and tfvars generation steps, see [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+For detailed AWS discovery, readiness, and tfvars generation steps, see [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ## Initial Setup
 
@@ -108,7 +108,7 @@ At this stage, keep the preflight focused on AWS identity, region, and service a
 
 You can run the deeper domain, hosted zone, and VPC-aware checks later as part of the readiness report flow.
 
-More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 3. Inspect VPC inputs
 
@@ -124,7 +124,7 @@ Inspect a VPC:
 
 Success signal: you understand which subnets and route tables will be used for frontend and backend deployment.
 
-More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 4. Register the domain and set up the hosted zone
 
@@ -174,7 +174,7 @@ Purpose: create a deployment config that includes your existing VPC inputs and k
 
 Success signal: `examples/generated.prod.tfvars` exists and contains your VPC, subnet, route table, and domain inputs.
 
-More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 7. Create the LiteLLM master key if Terraform will not generate it
 
@@ -193,7 +193,7 @@ If you do this, set these in your `tfvars`:
 
 Success signal: the secret exists in Secrets Manager.
 
-More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 8. Build the backend AMI
 
@@ -234,7 +234,7 @@ Then copy `UD-Q6_K_XL.gguf` onto the mounted volume and create a snapshot:
 
 Success signal: you have a usable `snap-...` value for `model_ebs_snapshot_id`.
 
-More detail: [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md).
+More detail: [docs/model-snapshots.md](docs/model-snapshots.md).
 
 ### 10. Fill in the deployment tfvars file
 
@@ -302,19 +302,19 @@ Use this as the quick index for later tasks.
 
 | Task | Primary entrypoint | Details |
 |---|---|---|
-| Check environment readiness | `./scripts/aws-readiness-report.sh` | [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md) |
-| Create deployment tfvars from existing VPCs | `./scripts/generate-existing-vpc-tfvars.sh` | [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md) |
-| Build or update model snapshot | `create-model-volume.sh`, `update-model-snapshot.sh` | [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md) |
-| Access the internal admin UI | internal admin ALB output | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Add or rotate LiteLLM keys/secrets | `create-litellm-secret.sh` or admin UI | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Change llama.cpp settings | edit `llama_cpp_settings` and apply | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Switch models | snapshot/model variable update | [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md) |
-| Refresh or roll backend instances | `./scripts/start-instance-refresh.sh` | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Upgrade llama.cpp | update image tag and apply | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Roll back | restore previous values and refresh | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Clean up safely | `make cleanup` or `cleanup-deployment.sh` | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Use SSM or optionally SSH | `aws ssm start-session` | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
-| Validate and format | `make fmt`, `make validate` | [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md) |
+| Check environment readiness | `./scripts/aws-readiness-report.sh` | [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md) |
+| Create deployment tfvars from existing VPCs | `./scripts/generate-existing-vpc-tfvars.sh` | [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md) |
+| Build or update model snapshot | `create-model-volume.sh`, `update-model-snapshot.sh` | [docs/model-snapshots.md](docs/model-snapshots.md) |
+| Access the internal admin UI | internal admin ALB output | [docs/operations.md](docs/operations.md) |
+| Add or rotate LiteLLM keys/secrets | `create-litellm-secret.sh` or admin UI | [docs/operations.md](docs/operations.md) |
+| Change llama.cpp settings | edit `llama_cpp_settings` and apply | [docs/operations.md](docs/operations.md) |
+| Switch models | snapshot/model variable update | [docs/model-snapshots.md](docs/model-snapshots.md) |
+| Refresh or roll backend instances | `./scripts/start-instance-refresh.sh` | [docs/operations.md](docs/operations.md) |
+| Upgrade llama.cpp | update image tag and apply | [docs/operations.md](docs/operations.md) |
+| Roll back | restore previous values and refresh | [docs/operations.md](docs/operations.md) |
+| Clean up safely | `make cleanup` or `cleanup-deployment.sh` | [docs/operations.md](docs/operations.md) |
+| Use SSM or optionally SSH | `aws ssm start-session` | [docs/operations.md](docs/operations.md) |
+| Validate and format | `make fmt`, `make validate` | [docs/operations.md](docs/operations.md) |
 
 ## Troubleshooting
 
@@ -335,7 +335,7 @@ Keep these checks in mind during first deployment:
 
 For deeper runbooks:
 
-- [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md)
-- [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md)
-- [docs/operations.md](/home/csandberg/projects/aws-llm-hosting/docs/operations.md)
-- [docs/architecture.md](/home/csandberg/projects/aws-llm-hosting/docs/architecture.md)
+- [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md)
+- [docs/model-snapshots.md](docs/model-snapshots.md)
+- [docs/operations.md](docs/operations.md)
+- [docs/architecture.md](docs/architecture.md)
