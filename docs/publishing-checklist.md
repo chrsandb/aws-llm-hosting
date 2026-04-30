@@ -16,6 +16,25 @@ Use this checklist before making the repository public on GitHub.
 - Review [CONTRIBUTING.md](../CONTRIBUTING.md) and [SECURITY.md](../SECURITY.md).
 - Set the repository description and topics in GitHub.
 
+Suggested GitHub description:
+
+`Production-ready Terraform, Packer, LiteLLM, and llama.cpp stack for hosting a shared internal LLM platform on AWS with private GPU backends.`
+
+Suggested GitHub topics:
+
+- `aws`
+- `terraform`
+- `packer`
+- `litellm`
+- `llama-cpp`
+- `llm`
+- `infrastructure-as-code`
+- `ecs`
+- `ec2`
+- `gpu`
+- `route53`
+- `acm`
+
 ## Technical Validation
 
 - Run `make fmt`

@@ -1,6 +1,16 @@
 # AWS LLM Hosting Platform
 
-Production-oriented Infrastructure-as-Code repository for hosting a shared developer LLM platform on AWS with:
+Production-ready Infrastructure-as-Code for running a shared internal LLM platform on AWS.
+
+This repository provisions a public `/v1` API through LiteLLM, routes requests to private GPU-backed `llama.cpp` workers, and is designed around existing VPCs, repeatable operations, and safe cleanup defaults.
+
+Repository status:
+
+- Ready for GitHub publication
+- Operator-focused quickstart and runbooks are in place
+- Terraform and Packer validation pass in the current repo state
+
+Main components:
 
 - Terraform
 - Packer
@@ -10,7 +20,7 @@ Production-oriented Infrastructure-as-Code repository for hosting a shared devel
 - Auto Scaling Group of private GPU instances
 - `llama.cpp` CUDA server for `unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL`
 
-The default deployment target is `eu-north-1` and is sized for roughly 10 developers with a baseline of one `g6e.2xlarge` backend instance and configurable scale-out.
+The default target is `eu-north-1` and the baseline shape is one private `g6e.2xlarge` backend instance, suitable for roughly 10 developers with configurable scale-out.
 
 ## What This Repo Deploys
 
