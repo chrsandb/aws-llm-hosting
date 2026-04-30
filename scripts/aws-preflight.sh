@@ -133,7 +133,7 @@ check_aws_call_with_parse() {
 
   if output="$(aws "${AWS_ARGS[@]}" "$@" 2>&1)"; then
     pass "${label}" "${success_detail}"
-    printf '%s' "${output}"
+    printf '%s' "${output}" >&2
     return 0
   else
     fail "${label}" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
@@ -322,10 +322,13 @@ if (( FAIL_COUNT > 0 )); then
   exit 1
 fi
 
-AZ_JSON="$(check_aws_call_with_parse "ec2:availability-zones" "queried" ec2 describe-availability-zones --all-availability-zones --output json || true)"
+AZ_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-availability-zones --all-availability-zones --output json 2>/tmp/aws-preflight-az.err || true)"
 if [[ -n "${AZ_JSON}" ]]; then
+  pass "ec2:availability-zones" "queried"
   AZ_COUNT="$(jq '.AvailabilityZones | length' <<<"${AZ_JSON}")"
   pass "ec2:availability-zones" "${AZ_COUNT} zones visible"
+else
+  fail "ec2:availability-zones" "$(tr '\n' ' ' </tmp/aws-preflight-az.err | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
 fi
 
 check_aws_call "ec2:vpcs" ec2 describe-vpcs --max-items 5
@@ -343,14 +346,17 @@ check_aws_call "iam:get-account-summary" iam get-account-summary
 
 check_quota_visibility
 
-INSTANCE_JSON="$(check_aws_call_with_parse "ec2:instance-type-offerings" "queried" ec2 describe-instance-type-offerings --location-type region --filters "Name=instance-type,Values=${INSTANCE_TYPE}" --output json || true)"
+INSTANCE_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-instance-type-offerings --location-type region --filters "Name=instance-type,Values=${INSTANCE_TYPE}" --output json 2>/tmp/aws-preflight-instance.err || true)"
 if [[ -n "${INSTANCE_JSON}" ]]; then
+  pass "ec2:instance-type-offerings" "queried"
   OFFER_COUNT="$(jq '.InstanceTypeOfferings | length' <<<"${INSTANCE_JSON}")"
   if (( OFFER_COUNT > 0 )); then
     pass "instance-type:${INSTANCE_TYPE}" "offered in ${ACTIVE_REGION}"
   else
     warn "instance-type:${INSTANCE_TYPE}" "not returned for ${ACTIVE_REGION}"
   fi
+else
+  fail "ec2:instance-type-offerings" "$(tr '\n' ' ' </tmp/aws-preflight-instance.err | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
 fi
 
 if [[ -n "${DOMAIN_NAME}" || -n "${ROUTE53_ZONE_ID}" ]]; then
