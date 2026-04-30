@@ -113,7 +113,38 @@ Deeper checks for a concrete environment:
 
 More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
 
-### 3. Generate a readiness report
+### 3. Inspect VPC inputs
+
+Purpose: confirm subnet roles and route tables for the existing frontend and backend VPCs.
+
+Inspect a VPC:
+
+```bash
+./scripts/discover-vpc-details.sh \
+  --region eu-north-1 \
+  --vpc-id vpc-0123456789abcdef0 | jq
+```
+
+Success signal: you understand which subnets and route tables will be used for frontend and backend deployment.
+
+More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
+
+### 4. Register the domain and set up the hosted zone
+
+Purpose: make sure Terraform can request an ACM certificate and create DNS validation records.
+
+Manual steps:
+
+1. Register the domain in Route53 Domains or another registrar.
+2. If `create_route53_zone = true`, Terraform will create the public hosted zone.
+3. If the domain is registered outside AWS, update the registrar name servers after the hosted zone exists.
+
+Success signal: the domain exists, and either:
+
+- you know the target `route53_zone_id`, or
+- you plan to set `create_route53_zone = true`
+
+### 5. Generate a readiness report
 
 Purpose: create a shareable Markdown summary of AWS access, DNS readiness, and VPC shape.
 
@@ -129,19 +160,9 @@ Purpose: create a shareable Markdown summary of AWS access, DNS readiness, and V
 
 Success signal: the script writes `docs/readiness-report.md`.
 
-### 4. Inspect and generate VPC inputs
+### 6. Generate a starter tfvars file
 
-Purpose: confirm subnet roles and create a starter `tfvars` file for existing VPCs.
-
-Inspect a VPC:
-
-```bash
-./scripts/discover-vpc-details.sh \
-  --region eu-north-1 \
-  --vpc-id vpc-0123456789abcdef0 | jq
-```
-
-Generate starter tfvars:
+Purpose: create a deployment config that includes your existing VPC inputs and known DNS values.
 
 ```bash
 ./scripts/generate-existing-vpc-tfvars.sh \
@@ -154,26 +175,11 @@ Generate starter tfvars:
   --route53-zone-id Z1234567890EXAMPLE > examples/generated.prod.tfvars
 ```
 
-Success signal: `examples/generated.prod.tfvars` exists and contains your VPC, subnet, and route table IDs.
+Success signal: `examples/generated.prod.tfvars` exists and contains your VPC, subnet, route table, and domain inputs.
 
 More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
 
-### 5. Register the domain and set up the hosted zone
-
-Purpose: make sure Terraform can request an ACM certificate and create DNS validation records.
-
-Manual steps:
-
-1. Register the domain in Route53 Domains or another registrar.
-2. If `create_route53_zone = true`, Terraform will create the public hosted zone.
-3. If the domain is registered outside AWS, update the registrar name servers after the hosted zone exists.
-
-Success signal: the domain exists, and either:
-
-- you know the target `route53_zone_id`, or
-- you plan to set `create_route53_zone = true`
-
-### 6. Create the LiteLLM master key if Terraform will not generate it
+### 7. Create the LiteLLM master key if Terraform will not generate it
 
 Purpose: prepare the admin/master key outside Terraform when you want explicit secret ownership.
 
@@ -192,7 +198,7 @@ Success signal: the secret exists in Secrets Manager.
 
 More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
 
-### 7. Build the backend AMI
+### 8. Build the backend AMI
 
 Purpose: create the GPU-ready backend image with Docker, NVIDIA runtime, systemd units, and CloudWatch agent installed.
 
@@ -207,7 +213,7 @@ make packer-build
 
 Success signal: Packer outputs a new AMI ID and writes `packer/manifest.json`.
 
-### 8. Create the model snapshot
+### 9. Create the model snapshot
 
 Purpose: prepare the model volume snapshot used by backend instances in production.
 
@@ -233,7 +239,7 @@ Success signal: you have a usable `snap-...` value for `model_ebs_snapshot_id`.
 
 More detail: [docs/model-snapshots.md](/home/csandberg/projects/aws-llm-hosting/docs/model-snapshots.md).
 
-### 9. Fill in the deployment tfvars file
+### 10. Fill in the deployment tfvars file
 
 Purpose: combine discovered network inputs, image artifacts, DNS, and secrets into one deployment config.
 
@@ -251,7 +257,7 @@ Fill in at least:
 
 Success signal: the file contains no placeholder AMI or snapshot IDs.
 
-### 10. Run Terraform
+### 11. Run Terraform
 
 Purpose: create the managed infrastructure for the deployment.
 
@@ -263,7 +269,7 @@ make apply TFVARS=examples/generated.prod.tfvars
 
 Success signal: Terraform completes successfully and prints outputs, including the public API endpoint and internal ALB names.
 
-### 11. Wait for the platform to become healthy
+### 12. Wait for the platform to become healthy
 
 Purpose: confirm ACM, ECS, and the backend ASG all stabilize before testing clients.
 
@@ -281,7 +287,7 @@ Optional backend check:
 
 Success signal: the backend health endpoint returns HTTP 200 and the ECS service stays stable.
 
-### 12. Test the public endpoint
+### 13. Test the public endpoint
 
 Purpose: confirm the public LiteLLM API is reachable.
 
