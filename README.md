@@ -100,16 +100,13 @@ Purpose: verify the active AWS identity, region, service access, and GPU instanc
 
 Success signal: the output ends with `Fail : 0`.
 
-Deeper checks for a concrete environment:
+At this stage, keep the preflight focused on AWS identity, region, and service access:
 
 ```bash
-./scripts/aws-preflight.sh \
-  --region eu-north-1 \
-  --domain-name llm.example.com \
-  --route53-zone-id Z1234567890EXAMPLE \
-  --frontend-vpc-id vpc-frontend123 \
-  --backend-vpc-id vpc-backend123
+./scripts/aws-preflight.sh --region eu-north-1
 ```
+
+You can run the deeper domain, hosted zone, and VPC-aware checks later as part of the readiness report flow.
 
 More detail: [docs/aws-cli-workflow.md](/home/csandberg/projects/aws-llm-hosting/docs/aws-cli-workflow.md).
 
