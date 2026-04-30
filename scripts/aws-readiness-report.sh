@@ -183,7 +183,7 @@ check_service "EC2 subnet read" ec2 describe-subnets --max-items 5
 check_service "Auto Scaling read" autoscaling describe-account-limits
 check_service "ELBv2 read" elbv2 describe-account-limits
 check_service "ECS read" ecs list-clusters --max-results 5
-check_service "RDS read" rds describe-db-instances --max-records 5
+check_service "RDS read" rds describe-db-instances --max-records 20
 check_service "Secrets Manager read" secretsmanager list-secrets --max-results 5
 check_service "SSM read" ssm describe-parameters --max-results 5
 check_service "ACM read" acm list-certificates --max-items 5
