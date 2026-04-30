@@ -3,6 +3,7 @@ terraform.tfstate
 terraform.tfstate.*
 crash.log
 packer/*.pkrvars.hcl
+!packer/backend.example.pkrvars.hcl
 packer/manifest.json
 *.retry
 *.log
