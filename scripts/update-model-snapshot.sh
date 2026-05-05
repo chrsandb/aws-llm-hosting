@@ -136,9 +136,14 @@ find_system_command() {
 imds_get() {
   local path="$1"
   local token
-  token="$(curl -fsSL -X PUT "http://169.254.169.254/latest/api/token" \
-    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
-  curl -fsSL -H "X-aws-ec2-metadata-token: ${token}" "http://169.254.169.254/latest/${path}"
+  token="$(curl -fsS --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || true)"
+  if [[ -z "${token}" ]]; then
+    echo "This helper must run on an EC2 instance when --volume-id is omitted. It could not reach the EC2 instance metadata service (IMDS)." >&2
+    echo "Run it on your backend helper EC2 instance, or use the advanced/manual path with an already attached volume and --volume-id." >&2
+    exit 1
+  fi
+  curl -fsS --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token: ${token}" "http://169.254.169.254/latest/${path}"
 }
 
 wait_for_volume_state() {
