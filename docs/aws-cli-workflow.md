@@ -229,31 +229,20 @@ Important:
 
 ## 8. Model Snapshot Preparation
 
-Create the initial EBS volume:
-
-```bash
-./scripts/create-model-volume.sh \
-  --region eu-north-1 \
-  --availability-zone eu-north-1a \
-  --size-gb 100
-```
-
 Create a local HF config file if needed:
 
 ```bash
 cp examples/huggingface.env.example .hf.env
 ```
 
-Then attach the volume to a helper instance and populate + snapshot it with:
+Then, on a helper EC2 instance in the backend environment, populate + snapshot the model volume with:
 
 ```bash
 ./scripts/update-model-snapshot.sh \
-  --volume-id vol-0123456789abcdef0 \
   --description "qwen3.6-35b-a3b initial snapshot" \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
-  --config ./.hf.env \
-  --device /dev/nvme1n1
+  --config ./.hf.env
 ```
 
 ## 9. Run Terraform
