@@ -15,6 +15,8 @@ Safe defaults:
 - does not delete pre-existing VPCs, subnets, route tables, or hosted zones
 - auto-discovers the latest locally built Packer AMI from packer/manifest.json
   when available, and removes that AMI plus its backing snapshots
+- auto-discovers temporary Packer build security groups tagged by
+  prepare-packer-build.sh and removes them
 - does not touch reusable Packer instance profiles or manually created artifacts
   outside the discovered manifest unless you pass them in
 
@@ -28,6 +30,7 @@ Options:
   --delete-ami-id AMI_ID
   --delete-snapshot-id SNAPSHOT_ID
   --delete-volume-id VOLUME_ID
+  --delete-security-group-id SG_ID
   --allow-network-destroy
   --force
 
@@ -53,6 +56,7 @@ SKIP_PACKER_ARTIFACTS="false"
 DELETE_AMI_IDS=()
 DELETE_SNAPSHOT_IDS=()
 DELETE_VOLUME_IDS=()
+DELETE_SECURITY_GROUP_IDS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -65,6 +69,7 @@ while [[ $# -gt 0 ]]; do
     --delete-ami-id) DELETE_AMI_IDS+=("$2"); shift 2 ;;
     --delete-snapshot-id) DELETE_SNAPSHOT_IDS+=("$2"); shift 2 ;;
     --delete-volume-id) DELETE_VOLUME_IDS+=("$2"); shift 2 ;;
+    --delete-security-group-id) DELETE_SECURITY_GROUP_IDS+=("$2"); shift 2 ;;
     --allow-network-destroy) ALLOW_NETWORK_DESTROY="true"; shift ;;
     --force) FORCE="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -101,6 +106,7 @@ fi
 
 PACKER_DISCOVERED_AMI_IDS=()
 PACKER_DISCOVERED_SNAPSHOT_IDS=()
+PACKER_DISCOVERED_SECURITY_GROUP_IDS=()
 
 append_unique() {
   local item="$1"
@@ -120,22 +126,24 @@ discover_packer_artifacts() {
   local ami_id
   local image_json
   local snapshot_id
+  local security_group_id
 
   [[ "${SKIP_PACKER_ARTIFACTS}" == "true" ]] && return 0
-  [[ ! -f "${manifest_path}" ]] && return 0
 
   command -v jq >/dev/null 2>&1 || {
     echo "Missing required command: jq (needed to parse ${manifest_path})" >&2
     exit 1
   }
 
-  while IFS= read -r artifact_id; do
-    [[ -z "${artifact_id}" ]] && continue
-    ami_id="${artifact_id##*:}"
-    if [[ "${ami_id}" =~ ^ami- ]]; then
-      append_unique "${ami_id}" manifest_ami_ids
-    fi
-  done < <(jq -r '.builds[]?.artifact_id // empty' "${manifest_path}")
+  if [[ -f "${manifest_path}" ]]; then
+    while IFS= read -r artifact_id; do
+      [[ -z "${artifact_id}" ]] && continue
+      ami_id="${artifact_id##*:}"
+      if [[ "${ami_id}" =~ ^ami- ]]; then
+        append_unique "${ami_id}" manifest_ami_ids
+      fi
+    done < <(jq -r '.builds[]?.artifact_id // empty' "${manifest_path}")
+  fi
 
   for ami_id in "${manifest_ami_ids[@]}"; do
     append_unique "${ami_id}" PACKER_DISCOVERED_AMI_IDS
@@ -146,6 +154,16 @@ discover_packer_artifacts() {
       done < <(jq -r '.Images[0].BlockDeviceMappings[]?.Ebs.SnapshotId // empty' <<<"${image_json}")
     fi
   done
+
+  while IFS= read -r security_group_id; do
+    [[ -z "${security_group_id}" || "${security_group_id}" == "None" ]] && continue
+    append_unique "${security_group_id}" PACKER_DISCOVERED_SECURITY_GROUP_IDS
+  done < <(aws "${AWS_ARGS[@]}" ec2 describe-security-groups \
+    --filters \
+      "Name=tag:ManagedBy,Values=prepare-packer-build.sh" \
+      "Name=tag:Role,Values=packer-build" \
+    --query 'SecurityGroups[].GroupId' \
+    --output text 2>/dev/null | tr '\t' '\n')
 }
 
 discover_packer_artifacts "${PACKER_MANIFEST}"
@@ -156,6 +174,10 @@ done
 
 for snapshot_id in "${PACKER_DISCOVERED_SNAPSHOT_IDS[@]}"; do
   append_unique "${snapshot_id}" DELETE_SNAPSHOT_IDS
+done
+
+for security_group_id in "${PACKER_DISCOVERED_SECURITY_GROUP_IDS[@]}"; do
+  append_unique "${security_group_id}" DELETE_SECURITY_GROUP_IDS
 done
 
 echo "Initializing Terraform in ${TERRAFORM_DIR}..."
@@ -195,6 +217,9 @@ fi
 if [[ "${#DELETE_VOLUME_IDS[@]}" -gt 0 ]]; then
   printf '  - Delete volumes: %s\n' "${DELETE_VOLUME_IDS[*]}"
 fi
+if [[ "${#DELETE_SECURITY_GROUP_IDS[@]}" -gt 0 ]]; then
+  printf '  - Delete Packer build security groups: %s\n' "${DELETE_SECURITY_GROUP_IDS[*]}"
+fi
 echo "  - Existing VPCs/subnets/route tables/hosted zones not tracked in Terraform state will not be touched."
 if [[ "${SKIP_PACKER_ARTIFACTS}" != "true" && -f "${PACKER_MANIFEST}" ]]; then
   echo "  - Reusable Packer instance profiles are not deleted automatically."
@@ -226,6 +251,11 @@ done
 for volume_id in "${DELETE_VOLUME_IDS[@]}"; do
   echo "Deleting volume ${volume_id}..."
   aws "${AWS_ARGS[@]}" ec2 delete-volume --volume-id "${volume_id}"
+done
+
+for security_group_id in "${DELETE_SECURITY_GROUP_IDS[@]}"; do
+  echo "Deleting security group ${security_group_id}..."
+  aws "${AWS_ARGS[@]}" ec2 delete-security-group --group-id "${security_group_id}" || true
 done
 
 echo

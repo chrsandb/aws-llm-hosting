@@ -27,7 +27,7 @@ Use the safe cleanup wrapper instead of a raw destroy when you want to remove th
 ./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
 ```
 
-By default, if `packer/manifest.json` exists, the cleanup script also deregisters the latest locally built Packer AMI from that manifest and deletes its backing snapshot(s).
+By default, if `packer/manifest.json` exists, the cleanup script also deregisters the latest locally built Packer AMI from that manifest, deletes its backing snapshot(s), and removes temporary Packer build security groups tagged by `prepare-packer-build.sh`.
 
 Key safeguards:
 
@@ -35,6 +35,7 @@ Key safeguards:
 - does not remove pre-existing VPCs, subnets, route tables, or hosted zones
 - refuses cleanup if Terraform state contains managed network resources, unless you pass `--allow-network-destroy`
 - does not delete reusable Packer instance profiles automatically
+- only auto-deletes Packer build security groups tagged `ManagedBy=prepare-packer-build.sh` and `Role=packer-build`
 
 To skip auto-discovered Packer artifacts and only destroy Terraform-managed resources:
 

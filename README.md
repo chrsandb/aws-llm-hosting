@@ -380,7 +380,7 @@ Use this as the quick index for later tasks.
 | Refresh or roll backend instances | `./scripts/start-instance-refresh.sh` | [docs/operations.md](docs/operations.md) |
 | Upgrade llama.cpp | update image tag and apply | [docs/operations.md](docs/operations.md) |
 | Roll back | restore previous values and refresh | [docs/operations.md](docs/operations.md) |
-| Clean up safely | `make cleanup` or `cleanup-deployment.sh` (also removes Packer AMIs from `packer/manifest.json` by default) | [docs/operations.md](docs/operations.md) |
+| Clean up safely | `make cleanup` or `cleanup-deployment.sh` (also removes Packer AMIs from `packer/manifest.json` and tagged Packer build SGs by default) | [docs/operations.md](docs/operations.md) |
 | Use SSM or optionally SSH | `aws ssm start-session` | [docs/operations.md](docs/operations.md) |
 | Validate and format | `make fmt`, `make validate` | [docs/operations.md](docs/operations.md) |
 
