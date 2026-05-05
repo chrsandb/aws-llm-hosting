@@ -284,32 +284,31 @@ Success signal: the helper prints a security group ID and Packer vars file path,
 
 Purpose: prepare the model volume snapshot used by backend instances in production.
 
-Create a local Hugging Face config file from the example and set `HF_TOKEN` if needed:
+Create a local Hugging Face config file from the example if needed:
 
 ```bash
 cp examples/huggingface.env.example .hf.env
 ```
 
-On a helper EC2 instance in the backend environment, run:
+Run the orchestration helper from your local machine:
 
 ```bash
-./scripts/update-model-snapshot.sh \
+./scripts/run-model-snapshot-job.sh \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
   --config ./.hf.env
 ```
 
-Success signal: the script prints a `snap-...` ID and updates `examples/generated.prod.tfvars` with `model_ebs_snapshot_id`.
+Success signal: the script prints a completed `snap-...` ID and updates `examples/generated.prod.tfvars` with `model_ebs_snapshot_id`.
 
 Important:
 
-- when `--volume-id` is omitted, the script creates an encrypted `gp3` staging volume, attaches it to the current helper instance, downloads the model, snapshots it, updates `model_ebs_snapshot_id` in your tfvars, and then removes the staging volume
-- it reads `HF_TOKEN` from the shell environment, `--hf-token`, or a `--config` file
+- the script launches a temporary helper EC2 instance in the first backend private subnet, prepares the model volume over SSM, snapshots it, updates your tfvars locally, and then terminates the helper instance
+- by default it uses a small temporary helper instance and a `100` GiB encrypted `gp3` model volume, which is a reasonable starting point for the default model
+- if the reusable helper instance profile does not exist, the script creates `llm-model-snapshot-helper` automatically using the same SSM-only pattern as the Packer helper profile
+- it reads `HF_TOKEN` from the shell environment or a `--config` file when needed
 - the EBS snapshot description is generated automatically from the configured model by default; set `SNAPSHOT_DESCRIPTION` in your config only if you want to override it
-- the helper instance must be an EC2 instance with AWS permissions to create, attach, snapshot, and delete EBS volumes
-- for the default model, `100` GB is a reasonable starting size and leaves room for a second model revision during updates
-- use `--keep-volume` only if you intentionally want to keep the staging volume attached after snapshot creation
-- `create-model-volume.sh` is still available as an advanced/manual fallback, but it is no longer the primary Step 9 path
+- `./scripts/update-model-snapshot.sh` remains available as an advanced/manual fallback when you intentionally want to run the workflow from inside an EC2 helper instance yourself
 
 More detail: [docs/model-snapshots.md](docs/model-snapshots.md).
 
@@ -381,7 +380,7 @@ Use this as the quick index for later tasks.
 |---|---|---|
 | Check environment readiness | `./scripts/aws-readiness-report.sh` | [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md) |
 | Create deployment tfvars from existing VPCs | `./scripts/generate-existing-vpc-tfvars.sh` | [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md) |
-| Build or update model snapshot | `./scripts/update-model-snapshot.sh` | [docs/model-snapshots.md](docs/model-snapshots.md) |
+| Build or update model snapshot | `./scripts/run-model-snapshot-job.sh` | [docs/model-snapshots.md](docs/model-snapshots.md) |
 | Access the internal admin UI | internal admin ALB output | [docs/operations.md](docs/operations.md) |
 | Add or rotate LiteLLM keys/secrets | `create-litellm-secret.sh` or admin UI | [docs/operations.md](docs/operations.md) |
 | Change llama.cpp settings | edit `llama_cpp_settings` and apply | [docs/operations.md](docs/operations.md) |

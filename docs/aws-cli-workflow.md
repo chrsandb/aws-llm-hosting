@@ -235,10 +235,10 @@ Create a local HF config file if needed:
 cp examples/huggingface.env.example .hf.env
 ```
 
-Then, on a helper EC2 instance in the backend environment, populate + snapshot the model volume with:
+Then run the model snapshot job from your local machine:
 
 ```bash
-./scripts/update-model-snapshot.sh \
+./scripts/run-model-snapshot-job.sh \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
   --config ./.hf.env
