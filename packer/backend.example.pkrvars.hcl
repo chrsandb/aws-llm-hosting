@@ -10,12 +10,12 @@ instance_type     = "g6e.2xlarge"
 ssh_username      = "ubuntu"
 ami_name_prefix   = "llm-backend"
 
-# Leave source_ami_id unset to use source_ami_name_pattern.
-# Set source_ami_id explicitly if you want to pin a known AMI. When set, it
-# overrides source_ami_name_pattern and the name filter is skipped.
-# source_ami_id = "ami-0123456789abcdef0"
+# Default pinned base AMI.
+source_ami_id = "ami-00e2c2ccdcd58e2ba"
 
-source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
+# Optional fallback search pattern. Use this only if you intentionally remove
+# source_ami_id and want Packer to resolve a base AMI by name instead.
+# source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
 
 # Optional: pre-created instance profile for locked-down AWS accounts. When set,
 # Packer uses this instead of creating a temporary role and instance profile.

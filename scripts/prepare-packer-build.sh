@@ -172,11 +172,12 @@ instance_type     = "${INSTANCE_TYPE}"
 ssh_username      = "ubuntu"
 ami_name_prefix   = "${AMI_NAME_PREFIX}"
 
-# Leave source_ami_id unset to use source_ami_name_pattern.
-# Set this explicitly if you want to pin a known AMI.
-# source_ami_id = "ami-0123456789abcdef0"
+# Default pinned base AMI.
+source_ami_id = "ami-00e2c2ccdcd58e2ba"
 
-source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
+# Optional fallback search pattern. Use this only if you intentionally remove
+# source_ami_id and want Packer to resolve a base AMI by name instead.
+# source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
 ${PACKER_INSTANCE_PROFILE_NAME:+packer_instance_profile_name = "${PACKER_INSTANCE_PROFILE_NAME}"}
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"

@@ -37,7 +37,7 @@ variable "ami_name_prefix" {
 
 variable "source_ami_id" {
   type    = string
-  default = null
+  default = "ami-00e2c2ccdcd58e2ba"
 }
 
 variable "source_ami_name_pattern" {
