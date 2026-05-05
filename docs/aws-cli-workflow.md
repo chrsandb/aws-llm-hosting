@@ -42,6 +42,26 @@ This additionally checks:
 - whether the backend VPC has at least 2 private subnets
 - whether private subnets appear to have default egress via NAT, TGW, instance, peering, or ENI
 
+Optional Packer build permission checks:
+
+```bash
+./scripts/aws-preflight.sh \
+  --region eu-north-1 \
+  --packer-vars-file packer/backend.auto.pkrvars.hcl
+```
+
+This adds checks for the specific AMI build inputs in that file, including:
+
+- whether the chosen source AMI is visible
+- whether the chosen subnet and security group are visible
+- whether `ec2:RunInstances` appears authorized for that subnet, security group, source AMI, and instance type using an EC2 dry run
+- whether the current principal appears to have the IAM actions needed for the temporary Packer role and instance profile, using IAM policy simulation when available
+
+Important:
+
+- this is deeper than the default preflight and is the right check to run if a Packer build fails at `RunInstances`
+- IAM simulation can still miss organization-level denies such as SCPs, so CloudTrail is still the source of truth for a final explicit deny reason
+
 Notes about the warnings:
 
 - if `domain_name` is a subdomain such as `llm.example.com`, a warning about no exact hosted zone is often harmless when the real hosted zone is the parent domain such as `example.com`

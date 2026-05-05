@@ -5,7 +5,8 @@ usage() {
   cat <<'EOF'
 Usage: aws-preflight.sh [--region REGION] [--profile PROFILE] [--instance-type TYPE] \
   [--domain-name DOMAIN] [--route53-zone-id ZONE_ID] \
-  [--frontend-vpc-id VPC_ID] [--backend-vpc-id VPC_ID]
+  [--frontend-vpc-id VPC_ID] [--backend-vpc-id VPC_ID] \
+  [--packer-vars-file PATH]
 
 Checks AWS-related local and account prerequisites for this repository:
 
@@ -18,11 +19,13 @@ Checks AWS-related local and account prerequisites for this repository:
 - Route53 hosted zone presence for a supplied domain or zone ID
 - frontend/backend VPC subnet shape and routing sanity checks
 - EC2 service quota visibility for GPU families
+- optional Packer build permission checks using a Packer vars file
 
 Examples:
   ./scripts/aws-preflight.sh --region eu-north-1
   ./scripts/aws-preflight.sh --profile prod-admin --region eu-north-1
   ./scripts/aws-preflight.sh --region eu-north-1 --domain-name llm.example.com --frontend-vpc-id vpc-123 --backend-vpc-id vpc-456
+  ./scripts/aws-preflight.sh --region eu-north-1 --packer-vars-file packer/backend.auto.pkrvars.hcl
 EOF
 }
 
@@ -33,6 +36,7 @@ DOMAIN_NAME=""
 ROUTE53_ZONE_ID=""
 FRONTEND_VPC_ID=""
 BACKEND_VPC_ID=""
+PACKER_VARS_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --route53-zone-id) ROUTE53_ZONE_ID="$2"; shift 2 ;;
     --frontend-vpc-id) FRONTEND_VPC_ID="$2"; shift 2 ;;
     --backend-vpc-id) BACKEND_VPC_ID="$2"; shift 2 ;;
+    --packer-vars-file) PACKER_VARS_FILE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1"; usage; exit 1 ;;
   esac
@@ -63,7 +68,9 @@ FAILURES=()
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_STS_ERR="$(mktemp)"
 TMP_VPC_ERR="$(mktemp)"
-trap 'rm -f "${TMP_STS_ERR}" "${TMP_VPC_ERR}"' EXIT
+TMP_AZ_ERR="$(mktemp)"
+TMP_INSTANCE_ERR="$(mktemp)"
+trap 'rm -f "${TMP_STS_ERR}" "${TMP_VPC_ERR}" "${TMP_AZ_ERR}" "${TMP_INSTANCE_ERR}"' EXIT
 
 status_line() {
   local level="$1"
@@ -123,6 +130,53 @@ check_aws_call() {
     pass "${label}" "ok"
   else
     fail "${label}" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fi
+}
+
+parse_hcl_string() {
+  local key="$1"
+  local path="$2"
+  sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"([^\"]+)\"[[:space:]]*$/\\1/p" "${path}" | head -n1
+}
+
+normalize_principal_arn() {
+  local arn="$1"
+  if [[ "${arn}" =~ ^arn:aws:sts::([0-9]+):assumed-role/([^/]+)/.+$ ]]; then
+    printf 'arn:aws:iam::%s:role/%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  else
+    printf '%s\n' "${arn}"
+  fi
+}
+
+check_ec2_dry_run() {
+  local label="$1"
+  shift
+  local output
+  if output="$(aws "${AWS_ARGS[@]}" ec2 "$@" --dry-run 2>&1)"; then
+    pass "${label}" "ok"
+  elif grep -qi "DryRunOperation" <<<"${output}"; then
+    pass "${label}" "authorized"
+  else
+    fail "${label}" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fi
+}
+
+check_iam_simulation() {
+  local source_arn="$1"
+  shift
+  local label="$1"
+  shift
+  local output
+  if output="$(aws "${AWS_ARGS[@]}" iam simulate-principal-policy --policy-source-arn "${source_arn}" --action-names "$@" 2>&1)"; then
+    local denied
+    denied="$(jq -r '.EvaluationResults[] | select(.EvalDecision != "allowed") | .EvalActionName' <<<"${output}" | paste -sd ', ' -)"
+    if [[ -z "${denied}" ]]; then
+      pass "${label}" "simulated actions allowed"
+    else
+      warn "${label}" "simulation denied: ${denied}"
+    fi
+  else
+    warn "${label}" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
   fi
 }
 
@@ -191,6 +245,82 @@ check_quota_visibility() {
   else
     warn "service-quotas:ec2" "$(tr '\n' ' ' <<<"${output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
   fi
+}
+
+check_packer_build_permissions() {
+  local pkrvars_path="$1"
+  local build_subnet
+  local build_sg
+  local build_ami
+  local build_vpc
+  local caller_role_arn
+  local image_output
+
+  if [[ ! -f "${pkrvars_path}" ]]; then
+    fail "packer:vars-file" "not found: ${pkrvars_path}"
+    return
+  fi
+
+  build_subnet="$(parse_hcl_string "subnet_id" "${pkrvars_path}")"
+  build_sg="$(parse_hcl_string "security_group_id" "${pkrvars_path}")"
+  build_ami="$(parse_hcl_string "source_ami_id" "${pkrvars_path}")"
+
+  if [[ -z "${build_subnet}" || -z "${build_sg}" ]]; then
+    fail "packer:vars-file" "subnet_id and security_group_id must be populated in ${pkrvars_path}"
+    return
+  fi
+
+  if [[ -z "${build_ami}" ]]; then
+    warn "packer:source-ami" "source_ami_id not set in ${pkrvars_path}; skipping exact RunInstances dry-run"
+  else
+    if image_output="$(aws "${AWS_ARGS[@]}" ec2 describe-images --image-ids "${build_ami}" --output json 2>&1)"; then
+      pass "packer:source-ami" "${build_ami} visible"
+    else
+      fail "packer:source-ami" "$(tr '\n' ' ' <<<"${image_output}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+    fi
+  fi
+
+  build_vpc="$(aws "${AWS_ARGS[@]}" ec2 describe-subnets --subnet-ids "${build_subnet}" --query 'Subnets[0].VpcId' --output text 2>/dev/null || true)"
+  if [[ -n "${build_vpc}" && "${build_vpc}" != "None" ]]; then
+    pass "packer:subnet" "${build_subnet} in ${build_vpc}"
+  else
+    fail "packer:subnet" "unable to resolve ${build_subnet}"
+  fi
+
+  if aws "${AWS_ARGS[@]}" ec2 describe-security-groups --group-ids "${build_sg}" >/dev/null 2>&1; then
+    pass "packer:security-group" "${build_sg} visible"
+  else
+    fail "packer:security-group" "${build_sg} not visible"
+  fi
+
+  check_ec2_dry_run "packer:create-security-group" create-security-group \
+    --group-name "preflight-dryrun-$(date +%s)" \
+    --description "AWS preflight dry run" \
+    --vpc-id "${build_vpc}"
+
+  check_ec2_dry_run "packer:create-key-pair" create-key-pair \
+    --key-name "preflight-dryrun-$(date +%s)"
+
+  if [[ -n "${build_ami}" ]]; then
+    check_ec2_dry_run "packer:run-instances" run-instances \
+      --image-id "${build_ami}" \
+      --instance-type "${INSTANCE_TYPE}" \
+      --subnet-id "${build_subnet}" \
+      --security-group-ids "${build_sg}" \
+      --count 1
+  fi
+
+  caller_role_arn="$(normalize_principal_arn "${ARN}")"
+  check_iam_simulation "${caller_role_arn}" "packer:iam-simulation" \
+    iam:CreateRole \
+    iam:DeleteRole \
+    iam:CreateInstanceProfile \
+    iam:DeleteInstanceProfile \
+    iam:AddRoleToInstanceProfile \
+    iam:RemoveRoleFromInstanceProfile \
+    iam:AttachRolePolicy \
+    iam:DetachRolePolicy \
+    iam:PassRole
 }
 
 check_vpc_shape() {
@@ -329,13 +459,13 @@ if (( FAIL_COUNT > 0 )); then
   exit 1
 fi
 
-AZ_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-availability-zones --all-availability-zones --output json 2>/tmp/aws-preflight-az.err || true)"
+AZ_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-availability-zones --all-availability-zones --output json 2>"${TMP_AZ_ERR}" || true)"
 if [[ -n "${AZ_JSON}" ]]; then
   pass "ec2:availability-zones" "queried"
   AZ_COUNT="$(jq '.AvailabilityZones | length' <<<"${AZ_JSON}")"
   pass "ec2:availability-zones" "${AZ_COUNT} zones visible"
 else
-  fail "ec2:availability-zones" "$(tr '\n' ' ' </tmp/aws-preflight-az.err | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fail "ec2:availability-zones" "$(tr '\n' ' ' <"${TMP_AZ_ERR}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
 fi
 
 check_aws_call "ec2:vpcs" ec2 describe-vpcs --max-items 5
@@ -353,7 +483,7 @@ check_aws_call "iam:get-account-summary" iam get-account-summary
 
 check_quota_visibility
 
-INSTANCE_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-instance-type-offerings --location-type region --filters "Name=instance-type,Values=${INSTANCE_TYPE}" --output json 2>/tmp/aws-preflight-instance.err || true)"
+INSTANCE_JSON="$(aws "${AWS_ARGS[@]}" ec2 describe-instance-type-offerings --location-type region --filters "Name=instance-type,Values=${INSTANCE_TYPE}" --output json 2>"${TMP_INSTANCE_ERR}" || true)"
 if [[ -n "${INSTANCE_JSON}" ]]; then
   pass "ec2:instance-type-offerings" "queried"
   OFFER_COUNT="$(jq '.InstanceTypeOfferings | length' <<<"${INSTANCE_JSON}")"
@@ -363,7 +493,7 @@ if [[ -n "${INSTANCE_JSON}" ]]; then
     warn "instance-type:${INSTANCE_TYPE}" "not returned for ${ACTIVE_REGION}"
   fi
 else
-  fail "ec2:instance-type-offerings" "$(tr '\n' ' ' </tmp/aws-preflight-instance.err | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
+  fail "ec2:instance-type-offerings" "$(tr '\n' ' ' <"${TMP_INSTANCE_ERR}" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
 fi
 
 if [[ -n "${DOMAIN_NAME}" || -n "${ROUTE53_ZONE_ID}" ]]; then
@@ -376,6 +506,10 @@ fi
 
 if [[ -n "${BACKEND_VPC_ID}" ]]; then
   check_vpc_shape "backend" "${BACKEND_VPC_ID}"
+fi
+
+if [[ -n "${PACKER_VARS_FILE}" ]]; then
+  check_packer_build_permissions "${PACKER_VARS_FILE}"
 fi
 
 echo

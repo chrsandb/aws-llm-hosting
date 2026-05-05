@@ -118,6 +118,16 @@ At this stage, keep the preflight focused on AWS identity, region, and service a
 
 You can run the deeper domain, hosted zone, and VPC-aware checks later as part of the readiness report flow.
 
+Before the Packer AMI build, you can also run a deeper permission check against the exact Packer inputs:
+
+```bash
+./scripts/aws-preflight.sh \
+  --region eu-north-1 \
+  --packer-vars-file packer/backend.auto.pkrvars.hcl
+```
+
+That check can catch common launch-permission problems such as denied `ec2:RunInstances` access for the selected subnet, instance type, security group, or source AMI.
+
 More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 3. Inspect VPC inputs
