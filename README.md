@@ -288,19 +288,35 @@ Create the initial volume:
 ./scripts/create-model-volume.sh \
   --region eu-north-1 \
   --availability-zone eu-north-1a \
-  --size-gb 300
+  --size-gb 100
 ```
 
-Then copy `UD-Q6_K_XL.gguf` onto the mounted volume and create a snapshot:
+Create a local Hugging Face config file from the example and set `HF_TOKEN` if needed:
+
+```bash
+cp examples/huggingface.env.example .hf.env
+```
+
+Then attach the volume to a helper instance, note its device path, and run:
 
 ```bash
 ./scripts/update-model-snapshot.sh \
-  vol-0123456789abcdef0 \
-  "qwen3.6-35b-a3b initial snapshot" \
-  eu-north-1
+  --volume-id vol-0123456789abcdef0 \
+  --description "qwen3.6-35b-a3b initial snapshot" \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --config ./.hf.env \
+  --device /dev/nvme1n1
 ```
 
 Success signal: you have a usable `snap-...` value for `model_ebs_snapshot_id`.
+
+Important:
+
+- `update-model-snapshot.sh` now downloads the configured model from Hugging Face onto the mounted volume and then snapshots it
+- it reads `HF_TOKEN` from the shell environment, `--hf-token`, or a `--config` file
+- the helper instance must have the volume attached at the device path you pass with `--device`
+- for the default model, `100` GB is a reasonable starting size and leaves room for a second model revision during updates
 
 More detail: [docs/model-snapshots.md](docs/model-snapshots.md).
 

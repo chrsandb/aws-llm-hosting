@@ -43,6 +43,8 @@ ${SUDO} apt-get install -y \
   jq \
   lsb-release \
   make \
+  python3 \
+  python3-pip \
   unzip \
   wget
 
@@ -71,9 +73,13 @@ case "${ARCH}" in
 esac
 ${SUDO} dpkg -i "${TMP_DIR}/session-manager-plugin.deb"
 
+echo "Installing Hugging Face CLI..."
+${SUDO} python3 -m pip install --break-system-packages --upgrade "huggingface_hub[cli]"
+
 echo
 echo "Installed versions:"
 terraform version | head -n 1
 packer version
 aws --version
 session-manager-plugin --version
+python3 -c 'import huggingface_hub; print(f"huggingface_hub {huggingface_hub.__version__}")'

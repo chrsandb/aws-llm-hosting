@@ -235,13 +235,25 @@ Create the initial EBS volume:
 ./scripts/create-model-volume.sh \
   --region eu-north-1 \
   --availability-zone eu-north-1a \
-  --size-gb 300
+  --size-gb 100
 ```
 
-Then copy the GGUF file onto the mounted volume and snapshot it with:
+Create a local HF config file if needed:
 
 ```bash
-./scripts/update-model-snapshot.sh vol-0123456789abcdef0 "qwen3.6-35b-a3b initial snapshot" eu-north-1
+cp examples/huggingface.env.example .hf.env
+```
+
+Then attach the volume to a helper instance and populate + snapshot it with:
+
+```bash
+./scripts/update-model-snapshot.sh \
+  --volume-id vol-0123456789abcdef0 \
+  --description "qwen3.6-35b-a3b initial snapshot" \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --config ./.hf.env \
+  --device /dev/nvme1n1
 ```
 
 ## 9. Run Terraform
