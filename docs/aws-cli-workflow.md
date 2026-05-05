@@ -208,6 +208,14 @@ packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr
 make packer-build PACKER_VARS=backend.auto.pkrvars.hcl
 ```
 
+The default `make packer-build` path now includes an AMI progress watcher. After Packer prints the AMI ID, it emits lines like:
+
+```text
+[ami-progress] AMI ami-...: state=pending, snapshot snap-...: pending 42%
+```
+
+This makes slow AMI finalization visible instead of looking hung.
+
 Important:
 
 - the Packer template uses AWS Session Manager for provisioning
@@ -217,6 +225,7 @@ Important:
 - if your organization requires a customer-managed KMS key for EBS encryption, add `root_volume_kms_key_id` to `packer/backend.auto.pkrvars.hcl`
 - when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile
 - if you want a different backend private subnet, pass `--subnet-id`
+- if Packer exits non-zero after creating the AMI, the watcher still helps confirm whether the AMI eventually became `available`
 
 ## 8. Model Snapshot Preparation
 

@@ -131,7 +131,7 @@ Optional SSH remains disabled by default. Enable it only when required by settin
 
 packer init packer/backend-ami.pkr.hcl
 packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
-packer build -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
+make packer-build PACKER_VARS=backend.auto.pkrvars.hcl
 ```
 
 For locked-down AWS accounts, create a reusable instance profile and include it in the Packer vars file:
@@ -156,3 +156,4 @@ Notes:
 - the selected backend private subnet still needs outbound access to SSM and package repositories
 - the Packer launch explicitly requires IMDSv2 and an encrypted `gp3` root volume
 - when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile
+- `make packer-build` now shows `[ami-progress]` lines with AMI state and backing snapshot progress from AWS

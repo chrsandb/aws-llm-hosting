@@ -49,4 +49,4 @@ packer-init:
 
 packer-build:
 	$(call require_cmd,packer)
-	packer build -var-file=$(PACKER_DIR)/$(PACKER_VARS) $(PACKER_DIR)/backend-ami.pkr.hcl
+	./scripts/packer-build-with-progress.sh --packer-dir $(PACKER_DIR) --packer-vars $(PACKER_VARS) --template backend-ami.pkr.hcl
