@@ -11,7 +11,8 @@ ssh_username      = "ubuntu"
 ami_name_prefix   = "llm-backend"
 
 # Leave source_ami_id unset to use source_ami_name_pattern.
-# Set this explicitly if you want to pin a known AMI.
+# Set source_ami_id explicitly if you want to pin a known AMI. When set, it
+# overrides source_ami_name_pattern and the name filter is skipped.
 # source_ami_id = "ami-0123456789abcdef0"
 
 source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"

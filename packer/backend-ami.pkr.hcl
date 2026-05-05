@@ -100,15 +100,18 @@ source "amazon-ebs" "backend" {
 
   source_ami = var.source_ami_id
 
-  source_ami_filter {
-    filters = {
-      name                = var.source_ami_name_pattern
-      architecture        = "x86_64"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
+  dynamic "source_ami_filter" {
+    for_each = var.source_ami_id == null ? [1] : []
+    content {
+      filters = {
+        name                = var.source_ami_name_pattern
+        architecture        = "x86_64"
+        root-device-type    = "ebs"
+        virtualization-type = "hvm"
+      }
+      most_recent = true
+      owners      = ["amazon"]
     }
-    most_recent = true
-    owners      = ["amazon"]
   }
 
   launch_block_device_mappings {
