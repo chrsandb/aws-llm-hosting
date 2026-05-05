@@ -31,6 +31,7 @@ fi
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
+TOOLS_VENV="/opt/aws-llm-hosting-tools"
 
 echo "Installing base packages..."
 ${SUDO} apt-get update
@@ -38,6 +39,7 @@ ${SUDO} apt-get install -y \
   apt-transport-https \
   ca-certificates \
   curl \
+  e2fsprogs \
   git \
   gnupg \
   jq \
@@ -45,8 +47,11 @@ ${SUDO} apt-get install -y \
   make \
   python3 \
   python3-pip \
+  python3-venv \
+  util-linux \
   unzip \
-  wget
+  wget \
+  xfsprogs
 
 echo "Installing HashiCorp APT repository..."
 curl -fsSL https://apt.releases.hashicorp.com/gpg | ${SUDO} gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -73,8 +78,15 @@ case "${ARCH}" in
 esac
 ${SUDO} dpkg -i "${TMP_DIR}/session-manager-plugin.deb"
 
-echo "Installing Hugging Face CLI..."
-${SUDO} python3 -m pip install --break-system-packages --upgrade "huggingface_hub[cli]"
+echo "Installing Hugging Face CLI into an isolated tool venv..."
+${SUDO} rm -rf "${TOOLS_VENV}"
+${SUDO} python3 -m venv "${TOOLS_VENV}"
+${SUDO} "${TOOLS_VENV}/bin/pip" install --upgrade pip
+${SUDO} "${TOOLS_VENV}/bin/pip" install huggingface_hub
+${SUDO} ln -sf "${TOOLS_VENV}/bin/hf" /usr/local/bin/hf
+if [[ -x "${TOOLS_VENV}/bin/huggingface-cli" ]]; then
+  ${SUDO} ln -sf "${TOOLS_VENV}/bin/huggingface-cli" /usr/local/bin/huggingface-cli
+fi
 
 echo
 echo "Installed versions:"
@@ -82,4 +94,4 @@ terraform version | head -n 1
 packer version
 aws --version
 session-manager-plugin --version
-python3 -c 'import huggingface_hub; print(f"huggingface_hub {huggingface_hub.__version__}")'
+"${TOOLS_VENV}/bin/python" -c 'import huggingface_hub; print(f"huggingface_hub {huggingface_hub.__version__}")'
