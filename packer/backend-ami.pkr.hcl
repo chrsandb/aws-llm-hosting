@@ -220,6 +220,10 @@ build {
     ] : ["echo model copy skipped"]
   }
 
+  provisioner "shell" {
+    script = "${path.root}/scripts/cleanup-image.sh"
+  }
+
   post-processor "manifest" {
     output = "${path.root}/manifest.json"
   }
