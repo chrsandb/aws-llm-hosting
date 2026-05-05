@@ -54,7 +54,23 @@ fi
 parse_tfvars_string() {
   local key="$1"
   local path="$2"
-  sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"([^\"]+)\"[[:space:]]*$/\\1/p" "${path}" | head -n1
+  sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"([^\"]+)\"([[:space:]]*#.*)?$/\\1/p" "${path}" | head -n1
+}
+
+parse_terraform_variable_default() {
+  local key="$1"
+  local path="$2"
+  awk -v key="${key}" '
+    $0 ~ "^[[:space:]]*variable \"" key "\"[[:space:]]*\\{" { in_block = 1; next }
+    in_block && $0 ~ "^[[:space:]]*default[[:space:]]*=" {
+      if (match($0, /"[^"]+"/)) {
+        value = substr($0, RSTART + 1, RLENGTH - 2)
+        print value
+        exit
+      }
+    }
+    in_block && $0 ~ "^[[:space:]]*}" { in_block = 0 }
+  ' "${path}" | head -n1
 }
 
 update_tfvars_string() {
@@ -273,8 +289,17 @@ if [[ -n "${TFVARS}" ]]; then
   [[ -z "${MODEL_FILENAME}" ]] && MODEL_FILENAME="$(parse_tfvars_string "model_filename" "${TFVARS}")"
 fi
 
+if [[ -z "${MODEL_REPO}" || -z "${MODEL_FILENAME}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  TERRAFORM_VARIABLES_FILE="${SCRIPT_DIR}/../terraform/variables.tf"
+  if [[ -f "${TERRAFORM_VARIABLES_FILE}" ]]; then
+    [[ -z "${MODEL_REPO}" ]] && MODEL_REPO="$(parse_terraform_variable_default "model_repo" "${TERRAFORM_VARIABLES_FILE}")"
+    [[ -z "${MODEL_FILENAME}" ]] && MODEL_FILENAME="$(parse_terraform_variable_default "model_filename" "${TERRAFORM_VARIABLES_FILE}")"
+  fi
+fi
+
 if [[ "${SNAPSHOT_ONLY}" != "true" && ( -z "${MODEL_REPO}" || -z "${MODEL_FILENAME}" ) ]]; then
-  echo "model_repo and model_filename are required unless --snapshot-only is used." >&2
+  echo "model_repo and model_filename are required unless --snapshot-only is used. Set them in tfvars, pass them on the CLI, or keep the Terraform defaults available." >&2
   exit 1
 fi
 
