@@ -21,6 +21,12 @@ source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 
 # Packer uses this instead of creating a temporary role and instance profile.
 # packer_instance_profile_name = "llm-packer-builder"
 
+root_volume_encrypted = true
+
+# Optional: set this if your organization requires a customer-managed KMS key
+# for EBS encryption during the Packer build.
+# root_volume_kms_key_id = "arn:aws:kms:eu-north-1:123456789012:key/00000000-0000-0000-0000-000000000000"
+
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"
 copy_model_into_ami     = false

@@ -154,4 +154,5 @@ Notes:
 - it creates a temporary security group in `backend_vpc_id`
 - the Packer template connects through AWS Session Manager, so the temporary security group does not need inbound SSH
 - the selected backend private subnet still needs outbound access to SSM and package repositories
+- the Packer launch explicitly requires IMDSv2 and an encrypted `gp3` root volume
 - when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile

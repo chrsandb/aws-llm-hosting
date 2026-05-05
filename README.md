@@ -252,6 +252,8 @@ Important:
 
 - the Packer build now connects through AWS Session Manager, so the temporary security group does not need inbound SSH
 - the chosen backend private subnet still needs outbound access to SSM and package repositories, either through NAT or the required VPC endpoints
+- the Packer launch now explicitly requires IMDSv2 and an encrypted `gp3` root volume
+- if your organization requires a customer-managed KMS key for EBS encryption, add `root_volume_kms_key_id` to `packer/backend.auto.pkrvars.hcl`
 - if you want to use a different backend private subnet, pass `--subnet-id subnet-...`
 - if your AWS account blocks temporary Packer roles or `iam:PassRole`, create a reusable instance profile and add it to the generated vars file:
 

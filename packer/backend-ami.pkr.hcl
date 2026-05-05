@@ -50,6 +50,16 @@ variable "packer_instance_profile_name" {
   default = null
 }
 
+variable "root_volume_encrypted" {
+  type    = bool
+  default = true
+}
+
+variable "root_volume_kms_key_id" {
+  type    = string
+  default = null
+}
+
 variable "llama_cpp_image_tag" {
   type    = string
   default = "server-cuda"
@@ -81,6 +91,11 @@ source "amazon-ebs" "backend" {
   subnet_id         = var.subnet_id
   security_group_id = var.security_group_id
   iam_instance_profile = var.packer_instance_profile_name
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
 
   dynamic "temporary_iam_instance_profile_policy_document" {
     for_each = var.packer_instance_profile_name == null ? [1] : []
@@ -127,6 +142,8 @@ source "amazon-ebs" "backend" {
     device_name           = "/dev/sda1"
     volume_size           = 100
     volume_type           = "gp3"
+    encrypted             = var.root_volume_encrypted
+    kms_key_id            = var.root_volume_kms_key_id
     delete_on_termination = true
   }
 

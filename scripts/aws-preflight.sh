@@ -257,6 +257,8 @@ check_packer_build_permissions() {
   local ami_name_prefix
   local model_source
   local llama_cpp_image_tag
+  local root_volume_encrypted
+  local root_volume_kms_key_id
   local caller_role_arn
   local image_output
   local run_args=()
@@ -273,6 +275,9 @@ check_packer_build_permissions() {
   ami_name_prefix="$(parse_hcl_string "ami_name_prefix" "${pkrvars_path}")"
   model_source="$(parse_hcl_string "model_source" "${pkrvars_path}")"
   llama_cpp_image_tag="$(parse_hcl_string "llama_cpp_image_tag" "${pkrvars_path}")"
+  root_volume_encrypted="$(sed -nE 's/^[[:space:]]*root_volume_encrypted[[:space:]]*=[[:space:]]*(true|false)[[:space:]]*$/\1/p' "${pkrvars_path}" | head -n1)"
+  root_volume_kms_key_id="$(parse_hcl_string "root_volume_kms_key_id" "${pkrvars_path}")"
+  root_volume_encrypted="${root_volume_encrypted:-true}"
 
   if [[ -z "${build_subnet}" || -z "${build_sg}" ]]; then
     fail "packer:vars-file" "subnet_id and security_group_id must be populated in ${pkrvars_path}"
@@ -327,10 +332,16 @@ check_packer_build_permissions() {
       --instance-type "${INSTANCE_TYPE}"
       --subnet-id "${build_subnet}"
       --security-group-ids "${build_sg}"
-      --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}]'
+      --metadata-options 'HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2'
       --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${ami_name_prefix:-llm-backend}-backend},{Key=ImageRole,Value=llama-backend},{Key=ManagedBy,Value=packer},{Key=ModelMode,Value=${model_source:-ebs_snapshot}},{Key=LlamaTag,Value=${llama_cpp_image_tag:-server-cuda}}]"
       --count 1
     )
+
+    if [[ -n "${root_volume_kms_key_id}" ]]; then
+      run_args+=(--block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":100,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true,\"Encrypted\":${root_volume_encrypted},\"KmsKeyId\":\"${root_volume_kms_key_id}\"}}]")
+    else
+      run_args+=(--block-device-mappings "[{\"DeviceName\":\"/dev/sda1\",\"Ebs\":{\"VolumeSize\":100,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true,\"Encrypted\":${root_volume_encrypted}}}]")
+    fi
 
     if [[ -n "${build_instance_profile}" ]]; then
       run_args+=(--iam-instance-profile "Name=${build_instance_profile}")
