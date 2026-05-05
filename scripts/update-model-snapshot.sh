@@ -156,6 +156,9 @@ wait_for_volume_state() {
     if [[ "${state}" == "${desired_state}" ]]; then
       return 0
     fi
+    if (( attempt == 0 || attempt % 6 == 0 )); then
+      echo "Volume ${volume_id}: waiting for state ${desired_state}, current state ${state:-unknown}..."
+    fi
     sleep 5
     attempt=$((attempt + 1))
   done
@@ -179,12 +182,55 @@ wait_for_attachment_state() {
     if [[ "${state}" == "${desired_state}" ]]; then
       return 0
     fi
+    if (( attempt == 0 || attempt % 6 == 0 )); then
+      echo "Volume ${volume_id}: waiting for attachment state ${desired_state}, current state ${state:-unknown}..."
+    fi
     sleep 5
     attempt=$((attempt + 1))
   done
 
   echo "Timed out waiting for volume ${volume_id} attachment state ${desired_state} (last state: ${state:-unknown})." >&2
   exit 1
+}
+
+wait_for_snapshot_completion() {
+  local snapshot_id="$1"
+  local state=""
+  local progress=""
+  local last_message=""
+
+  while true; do
+    state="$(aws ec2 describe-snapshots \
+      --region "${REGION}" \
+      --snapshot-ids "${snapshot_id}" \
+      --query 'Snapshots[0].State' \
+      --output text 2>/dev/null || true)"
+    progress="$(aws ec2 describe-snapshots \
+      --region "${REGION}" \
+      --snapshot-ids "${snapshot_id}" \
+      --query 'Snapshots[0].Progress' \
+      --output text 2>/dev/null || true)"
+
+    [[ -z "${state}" || "${state}" == "None" ]] && state="unknown"
+    [[ -z "${progress}" || "${progress}" == "None" ]] && progress="n/a"
+
+    if [[ "Snapshot ${snapshot_id}: ${state} ${progress}" != "${last_message}" ]]; then
+      last_message="Snapshot ${snapshot_id}: ${state} ${progress}"
+      echo "${last_message}"
+    fi
+
+    case "${state}" in
+      completed)
+        return 0
+        ;;
+      error)
+        echo "Snapshot ${snapshot_id} entered error state." >&2
+        exit 1
+        ;;
+    esac
+
+    sleep 20
+  done
 }
 
 list_block_devices() {
@@ -424,6 +470,7 @@ if [[ "${SNAPSHOT_ONLY}" != "true" ]]; then
 
   EXISTING_FS="$(${SUDO} "${BLKID_BIN}" -o value -s TYPE "${DEVICE}" 2>/dev/null || true)"
   if [[ -z "${EXISTING_FS}" ]]; then
+    echo "Creating ${FILESYSTEM} filesystem on ${DEVICE}..."
     case "${FILESYSTEM}" in
       ext4)
         ${SUDO} "${MKFS_EXT4_BIN}" -F "${DEVICE}" >/dev/null
@@ -445,6 +492,7 @@ if [[ "${SNAPSHOT_ONLY}" != "true" ]]; then
       exit 1
     fi
   else
+    echo "Mounting ${DEVICE} on ${MOUNT_POINT}..."
     ${SUDO} mount "${DEVICE}" "${MOUNT_POINT}"
     MOUNTED_BY_SCRIPT="true"
   fi
@@ -469,6 +517,9 @@ SNAPSHOT_ID="$(aws ec2 create-snapshot \
   --region "${REGION}" \
   --query 'SnapshotId' \
   --output text)"
+
+echo "Created snapshot request ${SNAPSHOT_ID}; polling AWS for progress..."
+wait_for_snapshot_completion "${SNAPSHOT_ID}"
 
 if [[ -n "${TFVARS}" ]]; then
   update_tfvars_string "model_ebs_snapshot_id" "${SNAPSHOT_ID}" "${TFVARS}"
