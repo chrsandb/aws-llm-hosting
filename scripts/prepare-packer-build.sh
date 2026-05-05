@@ -179,6 +179,12 @@ source_ami_id = "ami-00e2c2ccdcd58e2ba"
 # source_ami_id and want Packer to resolve a base AMI by name instead.
 # source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
 ${PACKER_INSTANCE_PROFILE_NAME:+packer_instance_profile_name = "${PACKER_INSTANCE_PROFILE_NAME}"}
+
+# Optional: extend or shorten how long Packer waits for the AMI snapshot to
+# finish. The defaults in the template allow roughly 90 minutes of waiter time.
+# aws_poll_delay_seconds = 20
+# aws_max_attempts       = 270
+
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"
 copy_model_into_ami     = false

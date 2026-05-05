@@ -60,6 +60,16 @@ variable "root_volume_kms_key_id" {
   default = null
 }
 
+variable "aws_poll_delay_seconds" {
+  type    = number
+  default = 20
+}
+
+variable "aws_max_attempts" {
+  type    = number
+  default = 270
+}
+
 variable "llama_cpp_image_tag" {
   type    = string
   default = "server-cuda"
@@ -95,6 +105,10 @@ source "amazon-ebs" "backend" {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
     http_put_response_hop_limit = 2
+  }
+  aws_polling {
+    delay_seconds = var.aws_poll_delay_seconds
+    max_attempts  = var.aws_max_attempts
   }
 
   dynamic "temporary_iam_instance_profile_policy_document" {

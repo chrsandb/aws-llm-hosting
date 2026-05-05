@@ -27,6 +27,11 @@ root_volume_encrypted = true
 # for EBS encryption during the Packer build.
 # root_volume_kms_key_id = "arn:aws:kms:eu-north-1:123456789012:key/00000000-0000-0000-0000-000000000000"
 
+# Optional: extend or shorten how long Packer waits for a slow AMI snapshot to
+# finish. The defaults below allow roughly 90 minutes of waiter time.
+# aws_poll_delay_seconds = 20
+# aws_max_attempts       = 270
+
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"
 copy_model_into_ami     = false

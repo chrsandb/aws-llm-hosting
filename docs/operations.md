@@ -169,5 +169,6 @@ Notes:
 - the Packer template connects through AWS Session Manager, so the temporary security group does not need inbound SSH
 - the selected backend private subnet still needs outbound access to SSM and package repositories
 - the Packer launch explicitly requires IMDSv2 and an encrypted `gp3` root volume
+- the Packer template now includes a longer AWS waiter by default, allowing roughly 90 minutes for slow AMI snapshot completion
 - when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile
 - `make packer-build` now shows `[ami-progress]` lines with AMI state and backing snapshot progress from AWS
