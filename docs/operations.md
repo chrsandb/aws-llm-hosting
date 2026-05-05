@@ -27,17 +27,30 @@ Use the safe cleanup wrapper instead of a raw destroy when you want to remove th
 ./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
 ```
 
+By default, if `packer/manifest.json` exists, the cleanup script also deregisters the latest locally built Packer AMI from that manifest and deletes its backing snapshot(s).
+
 Key safeguards:
 
 - only destroys Terraform-managed resources in state
 - does not remove pre-existing VPCs, subnets, route tables, or hosted zones
 - refuses cleanup if Terraform state contains managed network resources, unless you pass `--allow-network-destroy`
+- does not delete reusable Packer instance profiles automatically
 
-To also remove image artifacts created outside Terraform:
+To skip auto-discovered Packer artifacts and only destroy Terraform-managed resources:
 
 ```bash
 ./scripts/cleanup-deployment.sh \
   --tfvars examples/generated.prod.tfvars \
+  --skip-packer-artifacts \
+  --force
+```
+
+To also remove specific extra image artifacts created outside Terraform:
+
+```bash
+./scripts/cleanup-deployment.sh \
+  --tfvars examples/generated.prod.tfvars \
+  --skip-packer-artifacts \
   --delete-ami-id ami-0123456789abcdef0 \
   --delete-snapshot-id snap-0123456789abcdef0 \
   --force

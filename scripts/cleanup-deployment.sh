@@ -13,13 +13,18 @@ Safe defaults:
 - refuses to proceed if Terraform state contains managed VPC/network resources,
   unless you explicitly allow it
 - does not delete pre-existing VPCs, subnets, route tables, or hosted zones
-- does not delete manually created AMIs or snapshots unless you pass them in
+- auto-discovers the latest locally built Packer AMI from packer/manifest.json
+  when available, and removes that AMI plus its backing snapshots
+- does not touch reusable Packer instance profiles or manually created artifacts
+  outside the discovered manifest unless you pass them in
 
 Options:
   --tfvars FILE
   --terraform-dir DIR
   --region REGION
   --profile PROFILE
+  --packer-manifest FILE
+  --skip-packer-artifacts
   --delete-ami-id AMI_ID
   --delete-snapshot-id SNAPSHOT_ID
   --delete-volume-id VOLUME_ID
@@ -30,18 +35,20 @@ Examples:
   ./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
   ./scripts/cleanup-deployment.sh \
     --tfvars examples/generated.prod.tfvars \
+    --skip-packer-artifacts \
     --delete-ami-id ami-0123456789abcdef0 \
-    --delete-snapshot-id snap-0123456789abcdef0 \
     --force
 EOF
 }
 
 TFVARS=""
 TERRAFORM_DIR="terraform"
+PACKER_MANIFEST="packer/manifest.json"
 REGION=""
 PROFILE=""
 ALLOW_NETWORK_DESTROY="false"
 FORCE="false"
+SKIP_PACKER_ARTIFACTS="false"
 
 DELETE_AMI_IDS=()
 DELETE_SNAPSHOT_IDS=()
@@ -53,6 +60,8 @@ while [[ $# -gt 0 ]]; do
     --terraform-dir) TERRAFORM_DIR="$2"; shift 2 ;;
     --region) REGION="$2"; shift 2 ;;
     --profile) PROFILE="$2"; shift 2 ;;
+    --packer-manifest) PACKER_MANIFEST="$2"; shift 2 ;;
+    --skip-packer-artifacts) SKIP_PACKER_ARTIFACTS="true"; shift ;;
     --delete-ami-id) DELETE_AMI_IDS+=("$2"); shift 2 ;;
     --delete-snapshot-id) DELETE_SNAPSHOT_IDS+=("$2"); shift 2 ;;
     --delete-volume-id) DELETE_VOLUME_IDS+=("$2"); shift 2 ;;
@@ -89,6 +98,65 @@ fi
 if [[ -n "${REGION}" ]]; then
   AWS_ARGS+=(--region "${REGION}")
 fi
+
+PACKER_DISCOVERED_AMI_IDS=()
+PACKER_DISCOVERED_SNAPSHOT_IDS=()
+
+append_unique() {
+  local item="$1"
+  shift
+  local -n arr_ref="$1"
+  local existing
+  for existing in "${arr_ref[@]}"; do
+    [[ "${existing}" == "${item}" ]] && return 0
+  done
+  arr_ref+=("${item}")
+}
+
+discover_packer_artifacts() {
+  local manifest_path="$1"
+  local manifest_ami_ids=()
+  local artifact_id
+  local ami_id
+  local image_json
+  local snapshot_id
+
+  [[ "${SKIP_PACKER_ARTIFACTS}" == "true" ]] && return 0
+  [[ ! -f "${manifest_path}" ]] && return 0
+
+  command -v jq >/dev/null 2>&1 || {
+    echo "Missing required command: jq (needed to parse ${manifest_path})" >&2
+    exit 1
+  }
+
+  while IFS= read -r artifact_id; do
+    [[ -z "${artifact_id}" ]] && continue
+    ami_id="${artifact_id##*:}"
+    if [[ "${ami_id}" =~ ^ami- ]]; then
+      append_unique "${ami_id}" manifest_ami_ids
+    fi
+  done < <(jq -r '.builds[]?.artifact_id // empty' "${manifest_path}")
+
+  for ami_id in "${manifest_ami_ids[@]}"; do
+    append_unique "${ami_id}" PACKER_DISCOVERED_AMI_IDS
+    if image_json="$(aws "${AWS_ARGS[@]}" ec2 describe-images --image-ids "${ami_id}" --output json 2>/dev/null)"; then
+      while IFS= read -r snapshot_id; do
+        [[ -z "${snapshot_id}" || "${snapshot_id}" == "null" ]] && continue
+        append_unique "${snapshot_id}" PACKER_DISCOVERED_SNAPSHOT_IDS
+      done < <(jq -r '.Images[0].BlockDeviceMappings[]?.Ebs.SnapshotId // empty' <<<"${image_json}")
+    fi
+  done
+}
+
+discover_packer_artifacts "${PACKER_MANIFEST}"
+
+for ami_id in "${PACKER_DISCOVERED_AMI_IDS[@]}"; do
+  append_unique "${ami_id}" DELETE_AMI_IDS
+done
+
+for snapshot_id in "${PACKER_DISCOVERED_SNAPSHOT_IDS[@]}"; do
+  append_unique "${snapshot_id}" DELETE_SNAPSHOT_IDS
+done
 
 echo "Initializing Terraform in ${TERRAFORM_DIR}..."
 terraform -chdir="${TERRAFORM_DIR}" init >/dev/null
@@ -128,6 +196,9 @@ if [[ "${#DELETE_VOLUME_IDS[@]}" -gt 0 ]]; then
   printf '  - Delete volumes: %s\n' "${DELETE_VOLUME_IDS[*]}"
 fi
 echo "  - Existing VPCs/subnets/route tables/hosted zones not tracked in Terraform state will not be touched."
+if [[ "${SKIP_PACKER_ARTIFACTS}" != "true" && -f "${PACKER_MANIFEST}" ]]; then
+  echo "  - Reusable Packer instance profiles are not deleted automatically."
+fi
 
 if [[ "${FORCE}" != "true" ]]; then
   echo
@@ -144,12 +215,12 @@ terraform -chdir="${TERRAFORM_DIR}" destroy -var-file="${TFVARS_ABS}" -auto-appr
 
 for ami_id in "${DELETE_AMI_IDS[@]}"; do
   echo "Deregistering AMI ${ami_id}..."
-  aws "${AWS_ARGS[@]}" ec2 deregister-image --image-id "${ami_id}"
+  aws "${AWS_ARGS[@]}" ec2 deregister-image --image-id "${ami_id}" || true
 done
 
 for snapshot_id in "${DELETE_SNAPSHOT_IDS[@]}"; do
   echo "Deleting snapshot ${snapshot_id}..."
-  aws "${AWS_ARGS[@]}" ec2 delete-snapshot --snapshot-id "${snapshot_id}"
+  aws "${AWS_ARGS[@]}" ec2 delete-snapshot --snapshot-id "${snapshot_id}" || true
 done
 
 for volume_id in "${DELETE_VOLUME_IDS[@]}"; do
