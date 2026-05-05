@@ -257,6 +257,7 @@ Important:
 - if you want to use a different backend private subnet, pass `--subnet-id subnet-...`
 - if your AWS account blocks temporary Packer roles or `iam:PassRole`, create a reusable instance profile and add it to the generated vars file:
 - `make packer-build` now shows `[ami-progress]` lines after the AMI ID is created, including backing snapshot progress from AWS
+- unchanged progress is collapsed so you only see progress changes plus an occasional heartbeat on long waits
 - if Packer times out waiting for the AMI but the progress watcher later shows the AMI becomes `available`, you can usually keep and use that AMI ID
 
 ```bash

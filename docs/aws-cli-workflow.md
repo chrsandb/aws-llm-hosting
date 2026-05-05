@@ -214,7 +214,7 @@ The default `make packer-build` path now includes an AMI progress watcher. After
 [ami-progress] AMI ami-...: state=pending, snapshot snap-...: pending 42%
 ```
 
-This makes slow AMI finalization visible instead of looking hung.
+This makes slow AMI finalization visible instead of looking hung. The watcher now prints only when progress changes, plus an occasional `still progressing` heartbeat during long pauses.
 
 Important:
 

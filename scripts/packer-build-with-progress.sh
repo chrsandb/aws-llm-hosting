@@ -71,9 +71,25 @@ AWS_ARGS=()
 
 MONITOR_PID=""
 AMI_ID=""
+LAST_PROGRESS_MESSAGE=""
+UNCHANGED_PROGRESS_POLLS=0
 
 log_progress() {
   printf '[ami-progress] %s\n' "$1" >&2
+}
+
+log_progress_if_changed() {
+  local message="$1"
+  if [[ "${message}" == "${LAST_PROGRESS_MESSAGE}" ]]; then
+    UNCHANGED_PROGRESS_POLLS=$((UNCHANGED_PROGRESS_POLLS + 1))
+    if (( UNCHANGED_PROGRESS_POLLS % 6 == 0 )); then
+      log_progress "${message} (still progressing)"
+    fi
+  else
+    LAST_PROGRESS_MESSAGE="${message}"
+    UNCHANGED_PROGRESS_POLLS=0
+    log_progress "${message}"
+  fi
 }
 
 monitor_ami_progress() {
@@ -89,7 +105,7 @@ monitor_ami_progress() {
       --output text 2>/dev/null || true)"
 
     if [[ -z "${state}" || "${state}" == "None" ]]; then
-      log_progress "AMI ${ami_id}: no longer visible"
+      log_progress_if_changed "AMI ${ami_id}: no longer visible"
       return 0
     fi
 
@@ -99,7 +115,7 @@ monitor_ami_progress() {
       --output json 2>/dev/null || echo '[]')"
 
     if [[ "${snapshots_json}" == "[]" ]]; then
-      log_progress "AMI ${ami_id}: state=${state}, no snapshots reported yet"
+      log_progress_if_changed "AMI ${ami_id}: state=${state}, no snapshots reported yet"
     else
       while IFS= read -r snapshot_id; do
         [[ -z "${snapshot_id}" ]] && continue
@@ -111,9 +127,9 @@ monitor_ami_progress() {
           local snap_state snap_progress
           snap_state="$(jq -r '.State // "unknown"' <<<"${status_json}")"
           snap_progress="$(jq -r '.Progress // "n/a"' <<<"${status_json}")"
-          log_progress "AMI ${ami_id}: state=${state}, snapshot ${snapshot_id}: ${snap_state} ${snap_progress}"
+          log_progress_if_changed "AMI ${ami_id}: state=${state}, snapshot ${snapshot_id}: ${snap_state} ${snap_progress}"
         else
-          log_progress "AMI ${ami_id}: state=${state}, snapshot ${snapshot_id}: status unavailable"
+          log_progress_if_changed "AMI ${ami_id}: state=${state}, snapshot ${snapshot_id}: status unavailable"
         fi
       done < <(jq -r '.[]' <<<"${snapshots_json}")
     fi
@@ -139,21 +155,41 @@ start_monitor_if_needed() {
   fi
 }
 
-coproc PACKER_PROC { stdbuf -oL -eL packer build -var-file="${PACKER_VARS_PATH}" "${PACKER_TEMPLATE_PATH}" 2>&1; }
+TMP_STATUS_FILE="$(mktemp)"
+cleanup() {
+  if [[ -n "${MONITOR_PID}" ]]; then
+    kill "${MONITOR_PID}" >/dev/null 2>&1 || true
+    wait "${MONITOR_PID}" >/dev/null 2>&1 || true
+  fi
+  rm -f "${TMP_STATUS_FILE}"
+}
+trap cleanup EXIT
+
+coproc PACKER_PROC {
+  stdbuf -oL -eL packer build -var-file="${PACKER_VARS_PATH}" "${PACKER_TEMPLATE_PATH}" 2>&1
+  printf '%s' "$?" >"${TMP_STATUS_FILE}"
+}
 
 while IFS= read -r line <&"${PACKER_PROC[0]}"; do
   printf '%s\n' "${line}"
   start_monitor_if_needed "${line}"
 done
 
-if wait "${PACKER_PROC_PID}"; then
-  PACKER_STATUS=0
-else
-  PACKER_STATUS=$?
-fi
+while [[ ! -f "${TMP_STATUS_FILE}" ]]; do
+  sleep 1
+done
+
+PACKER_STATUS="$(cat "${TMP_STATUS_FILE}")"
+PACKER_STATUS="${PACKER_STATUS:-1}"
 
 if [[ -n "${MONITOR_PID}" ]]; then
-  wait "${MONITOR_PID}" || true
+  if (( PACKER_STATUS == 0 )); then
+    wait "${MONITOR_PID}" || true
+  else
+    kill "${MONITOR_PID}" >/dev/null 2>&1 || true
+    wait "${MONITOR_PID}" >/dev/null 2>&1 || true
+  fi
+  MONITOR_PID=""
 fi
 
 if (( PACKER_STATUS != 0 )) && [[ -n "${AMI_ID}" ]]; then
