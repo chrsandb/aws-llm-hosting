@@ -16,6 +16,11 @@ ami_name_prefix   = "llm-backend"
 # source_ami_id = "ami-0123456789abcdef0"
 
 source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
+
+# Optional: pre-created instance profile for locked-down AWS accounts. When set,
+# Packer uses this instead of creating a temporary role and instance profile.
+# packer_instance_profile_name = "llm-packer-builder"
+
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"
 copy_model_into_ami     = false

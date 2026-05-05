@@ -14,6 +14,8 @@ Options:
   --vpc-id VPC_ID                 Backend VPC ID. Required if --tfvars is not provided.
   --subnet-id SUBNET_ID           Backend private subnet ID to use for the build. Defaults to the first backend private subnet from --tfvars.
   --security-group-id SG_ID       Reuse an existing security group instead of creating one.
+  --packer-instance-profile-name NAME
+                                   Write a pre-created instance profile name into the Packer vars file.
   --security-group-name NAME      Name for the temporary security group if one is created.
   --pkrvars-out PATH              Write a populated Packer vars file, for example packer/backend.auto.pkrvars.hcl
   --instance-type TYPE            Override instance type written to the output vars file
@@ -39,6 +41,7 @@ TFVARS_PATH=""
 VPC_ID=""
 SUBNET_ID=""
 SECURITY_GROUP_ID=""
+PACKER_INSTANCE_PROFILE_NAME=""
 SECURITY_GROUP_NAME=""
 PKRVARS_OUT=""
 INSTANCE_TYPE=""
@@ -52,6 +55,7 @@ while [[ $# -gt 0 ]]; do
     --vpc-id) VPC_ID="$2"; shift 2 ;;
     --subnet-id) SUBNET_ID="$2"; shift 2 ;;
     --security-group-id) SECURITY_GROUP_ID="$2"; shift 2 ;;
+    --packer-instance-profile-name) PACKER_INSTANCE_PROFILE_NAME="$2"; shift 2 ;;
     --security-group-name) SECURITY_GROUP_NAME="$2"; shift 2 ;;
     --pkrvars-out) PKRVARS_OUT="$2"; shift 2 ;;
     --instance-type) INSTANCE_TYPE="$2"; shift 2 ;;
@@ -173,6 +177,7 @@ ami_name_prefix   = "${AMI_NAME_PREFIX}"
 # source_ami_id = "ami-0123456789abcdef0"
 
 source_ami_name_pattern = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
+${PACKER_INSTANCE_PROFILE_NAME:+packer_instance_profile_name = "${PACKER_INSTANCE_PROFILE_NAME}"}
 llama_cpp_image_tag     = "server-cuda"
 model_source            = "ebs_snapshot"
 copy_model_into_ami     = false

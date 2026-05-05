@@ -253,8 +253,13 @@ check_packer_build_permissions() {
   local build_sg
   local build_ami
   local build_vpc
+  local build_instance_profile
+  local ami_name_prefix
+  local model_source
+  local llama_cpp_image_tag
   local caller_role_arn
   local image_output
+  local run_args=()
 
   if [[ ! -f "${pkrvars_path}" ]]; then
     fail "packer:vars-file" "not found: ${pkrvars_path}"
@@ -264,6 +269,10 @@ check_packer_build_permissions() {
   build_subnet="$(parse_hcl_string "subnet_id" "${pkrvars_path}")"
   build_sg="$(parse_hcl_string "security_group_id" "${pkrvars_path}")"
   build_ami="$(parse_hcl_string "source_ami_id" "${pkrvars_path}")"
+  build_instance_profile="$(parse_hcl_string "packer_instance_profile_name" "${pkrvars_path}")"
+  ami_name_prefix="$(parse_hcl_string "ami_name_prefix" "${pkrvars_path}")"
+  model_source="$(parse_hcl_string "model_source" "${pkrvars_path}")"
+  llama_cpp_image_tag="$(parse_hcl_string "llama_cpp_image_tag" "${pkrvars_path}")"
 
   if [[ -z "${build_subnet}" || -z "${build_sg}" ]]; then
     fail "packer:vars-file" "subnet_id and security_group_id must be populated in ${pkrvars_path}"
@@ -293,6 +302,16 @@ check_packer_build_permissions() {
     fail "packer:security-group" "${build_sg} not visible"
   fi
 
+  if [[ -n "${build_instance_profile}" ]]; then
+    if aws "${AWS_ARGS[@]}" iam get-instance-profile --instance-profile-name "${build_instance_profile}" >/dev/null 2>&1; then
+      pass "packer:instance-profile" "${build_instance_profile} visible"
+    else
+      fail "packer:instance-profile" "${build_instance_profile} not visible"
+    fi
+  else
+    warn "packer:instance-profile" "using temporary Packer role/profile flow"
+  fi
+
   check_ec2_dry_run "packer:create-security-group" create-security-group \
     --group-name "preflight-dryrun-$(date +%s)" \
     --description "AWS preflight dry run" \
@@ -302,12 +321,22 @@ check_packer_build_permissions() {
     --key-name "preflight-dryrun-$(date +%s)"
 
   if [[ -n "${build_ami}" ]]; then
-    check_ec2_dry_run "packer:run-instances" run-instances \
-      --image-id "${build_ami}" \
-      --instance-type "${INSTANCE_TYPE}" \
-      --subnet-id "${build_subnet}" \
-      --security-group-ids "${build_sg}" \
+    run_args=(
+      run-instances
+      --image-id "${build_ami}"
+      --instance-type "${INSTANCE_TYPE}"
+      --subnet-id "${build_subnet}"
+      --security-group-ids "${build_sg}"
+      --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":100,"VolumeType":"gp3","DeleteOnTermination":true}}]'
+      --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${ami_name_prefix:-llm-backend}-backend},{Key=ImageRole,Value=llama-backend},{Key=ManagedBy,Value=packer},{Key=ModelMode,Value=${model_source:-ebs_snapshot}},{Key=LlamaTag,Value=${llama_cpp_image_tag:-server-cuda}}]"
       --count 1
+    )
+
+    if [[ -n "${build_instance_profile}" ]]; then
+      run_args+=(--iam-instance-profile "Name=${build_instance_profile}")
+    fi
+
+    check_ec2_dry_run "packer:run-instances" "${run_args[@]}"
   fi
 
   caller_role_arn="$(normalize_principal_arn "${ARN}")"

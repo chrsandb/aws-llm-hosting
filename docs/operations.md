@@ -134,9 +134,24 @@ packer validate -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr
 packer build -var-file=packer/backend.auto.pkrvars.hcl packer/backend-ami.pkr.hcl
 ```
 
+For locked-down AWS accounts, create a reusable instance profile and include it in the Packer vars file:
+
+```bash
+./scripts/create-packer-instance-profile.sh \
+  --region eu-north-1 \
+  --name llm-packer-builder
+
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --packer-instance-profile-name llm-packer-builder \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+```
+
 Notes:
 
 - the helper selects a backend private subnet from `backend_private_subnet_ids`
 - it creates a temporary security group in `backend_vpc_id`
 - the Packer template connects through AWS Session Manager, so the temporary security group does not need inbound SSH
 - the selected backend private subnet still needs outbound access to SSM and package repositories
+- when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile

@@ -182,6 +182,24 @@ This helper:
 - creates a temporary security group for the Packer build instance
 - writes `packer/backend.auto.pkrvars.hcl`
 
+If your AWS account blocks temporary Packer roles or `iam:PassRole`, create a reusable instance profile first:
+
+```bash
+./scripts/create-packer-instance-profile.sh \
+  --region eu-north-1 \
+  --name llm-packer-builder
+```
+
+Then regenerate the Packer vars file with that profile:
+
+```bash
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --packer-instance-profile-name llm-packer-builder \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+```
+
 Then run:
 
 ```bash
@@ -195,6 +213,7 @@ Important:
 - the Packer template uses AWS Session Manager for provisioning
 - you do not need inbound SSH on the temporary build security group
 - the selected backend private subnet still needs outbound access to SSM and package repositories, either through NAT or the required VPC endpoints
+- when `packer_instance_profile_name` is set, Packer reuses that profile instead of creating a temporary role and instance profile
 - if you want a different backend private subnet, pass `--subnet-id`
 
 ## 8. Model Snapshot Preparation

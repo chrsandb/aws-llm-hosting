@@ -253,6 +253,23 @@ Important:
 - the Packer build now connects through AWS Session Manager, so the temporary security group does not need inbound SSH
 - the chosen backend private subnet still needs outbound access to SSM and package repositories, either through NAT or the required VPC endpoints
 - if you want to use a different backend private subnet, pass `--subnet-id subnet-...`
+- if your AWS account blocks temporary Packer roles or `iam:PassRole`, create a reusable instance profile and add it to the generated vars file:
+
+```bash
+./scripts/create-packer-instance-profile.sh \
+  --region eu-north-1 \
+  --name llm-packer-builder
+```
+
+Then either set `packer_instance_profile_name = "llm-packer-builder"` manually in `packer/backend.auto.pkrvars.hcl`, or regenerate the file with:
+
+```bash
+./scripts/prepare-packer-build.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars \
+  --packer-instance-profile-name llm-packer-builder \
+  --pkrvars-out packer/backend.auto.pkrvars.hcl
+```
 
 Success signal: the helper prints a security group ID and Packer vars file path, then Packer outputs a new AMI ID and writes `packer/manifest.json`.
 

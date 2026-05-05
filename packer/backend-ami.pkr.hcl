@@ -45,6 +45,11 @@ variable "source_ami_name_pattern" {
   default = "Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 22.04)*"
 }
 
+variable "packer_instance_profile_name" {
+  type    = string
+  default = null
+}
+
 variable "llama_cpp_image_tag" {
   type    = string
   default = "server-cuda"
@@ -75,26 +80,30 @@ source "amazon-ebs" "backend" {
   pause_before_ssm  = "20s"
   subnet_id         = var.subnet_id
   security_group_id = var.security_group_id
+  iam_instance_profile = var.packer_instance_profile_name
 
-  temporary_iam_instance_profile_policy_document {
-    Version = "2012-10-17"
+  dynamic "temporary_iam_instance_profile_policy_document" {
+    for_each = var.packer_instance_profile_name == null ? [1] : []
+    content {
+      Version = "2012-10-17"
 
-    Statement {
-      Effect = "Allow"
-      Action = [
-        "ssm:UpdateInstanceInformation",
-        "ssmmessages:CreateControlChannel",
-        "ssmmessages:CreateDataChannel",
-        "ssmmessages:OpenControlChannel",
-        "ssmmessages:OpenDataChannel",
-        "ec2messages:AcknowledgeMessage",
-        "ec2messages:DeleteMessage",
-        "ec2messages:FailMessage",
-        "ec2messages:GetEndpoint",
-        "ec2messages:GetMessages",
-        "ec2messages:SendReply"
-      ]
-      Resource = ["*"]
+      Statement {
+        Effect = "Allow"
+        Action = [
+          "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel",
+          "ec2messages:AcknowledgeMessage",
+          "ec2messages:DeleteMessage",
+          "ec2messages:FailMessage",
+          "ec2messages:GetEndpoint",
+          "ec2messages:GetMessages",
+          "ec2messages:SendReply"
+        ]
+        Resource = ["*"]
+      }
     }
   }
 
