@@ -294,7 +294,6 @@ On a helper EC2 instance in the backend environment, run:
 
 ```bash
 ./scripts/update-model-snapshot.sh \
-  --description "qwen3.6-35b-a3b initial snapshot" \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
   --config ./.hf.env
@@ -306,6 +305,7 @@ Important:
 
 - when `--volume-id` is omitted, the script creates an encrypted `gp3` staging volume, attaches it to the current helper instance, downloads the model, snapshots it, updates `model_ebs_snapshot_id` in your tfvars, and then removes the staging volume
 - it reads `HF_TOKEN` from the shell environment, `--hf-token`, or a `--config` file
+- the EBS snapshot description is generated automatically from the configured model by default; set `SNAPSHOT_DESCRIPTION` in your config only if you want to override it
 - the helper instance must be an EC2 instance with AWS permissions to create, attach, snapshot, and delete EBS volumes
 - for the default model, `100` GB is a reasonable starting size and leaves room for a second model revision during updates
 - use `--keep-volume` only if you intentionally want to keep the staging volume attached after snapshot creation

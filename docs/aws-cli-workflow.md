@@ -239,7 +239,6 @@ Then, on a helper EC2 instance in the backend environment, populate + snapshot t
 
 ```bash
 ./scripts/update-model-snapshot.sh \
-  --description "qwen3.6-35b-a3b initial snapshot" \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
   --config ./.hf.env

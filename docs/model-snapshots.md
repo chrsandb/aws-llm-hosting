@@ -20,6 +20,7 @@ cp examples/huggingface.env.example .hf.env
 That file can contain:
 
 - `HF_TOKEN`
+- optional `SNAPSHOT_DESCRIPTION`
 - optional `MODEL_REPO`
 - optional `MODEL_FILENAME`
 - optional `MOUNT_POINT`
@@ -46,11 +47,12 @@ Example:
 
 ```bash
 ./scripts/update-model-snapshot.sh \
-  --description "qwen3.6-35b-a3b initial snapshot" \
   --region eu-north-1 \
   --tfvars examples/generated.prod.tfvars \
   --config ./.hf.env
 ```
+
+By default, the script derives a snapshot description from the configured model repo and filename. Set `SNAPSHOT_DESCRIPTION` only when you want a custom label.
 
 Optional advanced/manual path:
 

@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  update-model-snapshot.sh --description DESC --region REGION [options]
+  update-model-snapshot.sh --region REGION [options]
 
 Download the configured GGUF model from Hugging Face onto an EBS volume and
 create an EBS snapshot for Terraform. When --volume-id is omitted, the script
@@ -13,7 +13,7 @@ instance, auto-detects the device, and updates the tfvars file with the new
 snapshot ID.
 
 Options:
-  --description DESC              Snapshot description
+  --description DESC              Optional snapshot description override
   --region REGION                 AWS region
   --tfvars FILE                   Read model_repo/model_filename and update model_ebs_snapshot_id
   --volume-id VOL                 Use an existing attached EBS volume instead of auto-creating one
@@ -26,7 +26,7 @@ Options:
   --filesystem TYPE               Filesystem to create if needed, default: ext4
   --model-repo REPO               Hugging Face repo, for example unsloth/Qwen3.6-35B-A3B-GGUF
   --model-filename FILE           Model file inside the repo, for example UD-Q6_K_XL.gguf
-  --config FILE                   Shell-style config file. Supports HF_TOKEN and model defaults.
+  --config FILE                   Shell-style config file. Supports HF_TOKEN, SNAPSHOT_DESCRIPTION, and model defaults.
   --hf-token TOKEN                Hugging Face token. Overrides config and env.
   --keep-volume                   Keep an auto-created volume attached after snapshot creation
   --snapshot-only                 Skip download work and only snapshot the target volume
@@ -34,13 +34,11 @@ Options:
 
 Examples:
   ./scripts/update-model-snapshot.sh \
-    --description "qwen3.6-35b-a3b initial snapshot" \
     --region eu-north-1 \
     --tfvars examples/generated.prod.tfvars \
     --config ./.hf.env
 
   ./scripts/update-model-snapshot.sh \
-    --description "re-snapshot existing model volume" \
     --region eu-north-1 \
     --volume-id vol-0123456789abcdef0 \
     --device /dev/nvme1n1 \
@@ -164,6 +162,30 @@ detect_new_device() {
   comm -13 <(sort "${before_file}") <(sort "${after_file}") | head -n1
 }
 
+slugify() {
+  tr '[:upper:]' '[:lower:]' <<<"$1" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
+}
+
+derive_snapshot_description() {
+  local repo="$1"
+  local filename="$2"
+  local repo_part=""
+  local file_part=""
+
+  repo_part="$(slugify "${repo##*/}")"
+  file_part="$(slugify "${filename%.gguf}")"
+
+  if [[ -n "${repo_part}" && -n "${file_part}" ]]; then
+    printf '%s-%s-model-snapshot' "${repo_part}" "${file_part}"
+  elif [[ -n "${repo_part}" ]]; then
+    printf '%s-model-snapshot' "${repo_part}"
+  elif [[ -n "${file_part}" ]]; then
+    printf '%s-model-snapshot' "${file_part}"
+  else
+    printf 'llm-model-snapshot'
+  fi
+}
+
 DESCRIPTION=""
 REGION=""
 TFVARS=""
@@ -179,6 +201,7 @@ MODEL_REPO=""
 MODEL_FILENAME=""
 CONFIG_FILE=""
 HF_TOKEN="${HF_TOKEN:-}"
+SNAPSHOT_DESCRIPTION="${SNAPSHOT_DESCRIPTION:-}"
 KEEP_VOLUME="false"
 SNAPSHOT_ONLY="false"
 
@@ -217,7 +240,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${DESCRIPTION}" || -z "${REGION}" ]]; then
+if [[ -z "${REGION}" ]]; then
   usage >&2
   exit 1
 fi
@@ -239,6 +262,7 @@ fi
 [[ -n "${CLI_MOUNT_POINT}" ]] && MOUNT_POINT="${CLI_MOUNT_POINT}"
 [[ -n "${CLI_FILESYSTEM}" ]] && FILESYSTEM="${CLI_FILESYSTEM}"
 [[ -n "${CLI_HF_TOKEN}" ]] && HF_TOKEN="${CLI_HF_TOKEN}"
+[[ -z "${DESCRIPTION}" && -n "${SNAPSHOT_DESCRIPTION}" ]] && DESCRIPTION="${SNAPSHOT_DESCRIPTION}"
 
 if [[ -n "${TFVARS}" ]]; then
   if [[ ! -f "${TFVARS}" ]]; then
@@ -252,6 +276,10 @@ fi
 if [[ "${SNAPSHOT_ONLY}" != "true" && ( -z "${MODEL_REPO}" || -z "${MODEL_FILENAME}" ) ]]; then
   echo "model_repo and model_filename are required unless --snapshot-only is used." >&2
   exit 1
+fi
+
+if [[ -z "${DESCRIPTION}" ]]; then
+  DESCRIPTION="$(derive_snapshot_description "${MODEL_REPO}" "${MODEL_FILENAME}")"
 fi
 
 for cmd in aws curl lsblk sync findmnt blkid rg mktemp; do
@@ -398,6 +426,7 @@ fi
 
 echo "Volume:   ${VOLUME_ID}"
 echo "Device:   ${DEVICE}"
+echo "Description: ${DESCRIPTION}"
 echo "Snapshot: ${SNAPSHOT_ID}"
 if [[ -n "${TFVARS}" ]]; then
   echo "Updated ${TFVARS} with model_ebs_snapshot_id = \"${SNAPSHOT_ID}\""
