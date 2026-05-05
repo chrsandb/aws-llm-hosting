@@ -114,6 +114,25 @@ run_hf() {
   fi
 }
 
+find_system_command() {
+  local name="$1"
+  local candidate=""
+
+  for candidate in \
+    "$(command -v "${name}" 2>/dev/null || true)" \
+    "/usr/sbin/${name}" \
+    "/sbin/${name}" \
+    "/usr/bin/${name}" \
+    "/bin/${name}"; do
+    if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 imds_get() {
   local path="$1"
   local token
@@ -169,7 +188,7 @@ wait_for_attachment_state() {
 }
 
 list_block_devices() {
-  lsblk -dnpo NAME,TYPE | awk '$2 == "disk" { print $1 }'
+  "${LSBLK_BIN}" -dnpo NAME,TYPE | awk '$2 == "disk" { print $1 }'
 }
 
 detect_new_device() {
@@ -307,12 +326,18 @@ if [[ -z "${DESCRIPTION}" ]]; then
   DESCRIPTION="$(derive_snapshot_description "${MODEL_REPO}" "${MODEL_FILENAME}")"
 fi
 
-for cmd in aws curl lsblk sync findmnt blkid rg mktemp; do
-  command -v "${cmd}" >/dev/null 2>&1 || {
+for cmd in aws curl lsblk sync findmnt blkid rg mktemp mkfs.ext4 mkfs.xfs; do
+  if ! find_system_command "${cmd}" >/dev/null 2>&1; then
     echo "Missing required command: ${cmd}" >&2
     exit 1
-  }
+  fi
 done
+
+LSBLK_BIN="$(find_system_command lsblk)"
+FINDMNT_BIN="$(find_system_command findmnt)"
+BLKID_BIN="$(find_system_command blkid)"
+MKFS_EXT4_BIN="$(find_system_command mkfs.ext4)"
+MKFS_XFS_BIN="$(find_system_command mkfs.xfs)"
 
 AUTO_CREATED_VOLUME="false"
 ATTACHED_BY_SCRIPT="false"
@@ -397,14 +422,14 @@ fi
 if [[ "${SNAPSHOT_ONLY}" != "true" ]]; then
   ${SUDO} mkdir -p "${MOUNT_POINT}"
 
-  EXISTING_FS="$(${SUDO} blkid -o value -s TYPE "${DEVICE}" 2>/dev/null || true)"
+  EXISTING_FS="$(${SUDO} "${BLKID_BIN}" -o value -s TYPE "${DEVICE}" 2>/dev/null || true)"
   if [[ -z "${EXISTING_FS}" ]]; then
     case "${FILESYSTEM}" in
       ext4)
-        ${SUDO} mkfs.ext4 -F "${DEVICE}" >/dev/null
+        ${SUDO} "${MKFS_EXT4_BIN}" -F "${DEVICE}" >/dev/null
         ;;
       xfs)
-        ${SUDO} mkfs.xfs -f "${DEVICE}" >/dev/null
+        ${SUDO} "${MKFS_XFS_BIN}" -f "${DEVICE}" >/dev/null
         ;;
       *)
         echo "Unsupported filesystem: ${FILESYSTEM}" >&2
@@ -413,8 +438,8 @@ if [[ "${SNAPSHOT_ONLY}" != "true" ]]; then
     esac
   fi
 
-  if findmnt -n "${MOUNT_POINT}" >/dev/null 2>&1; then
-    CURRENT_SOURCE="$(findmnt -n -o SOURCE "${MOUNT_POINT}")"
+  if "${FINDMNT_BIN}" -n "${MOUNT_POINT}" >/dev/null 2>&1; then
+    CURRENT_SOURCE="$("${FINDMNT_BIN}" -n -o SOURCE "${MOUNT_POINT}")"
     if [[ "${CURRENT_SOURCE}" != "${DEVICE}" ]]; then
       echo "Mount point ${MOUNT_POINT} is already in use by ${CURRENT_SOURCE}." >&2
       exit 1
