@@ -380,6 +380,7 @@ cleanup() {
   fi
 
   [[ -n "${PARAMS_FILE:-}" ]] && rm -f "${PARAMS_FILE}"
+  [[ -n "${REMOTE_SCRIPT_WRAPPED:-}" ]] && rm -f "${REMOTE_SCRIPT_WRAPPED}"
 }
 trap cleanup EXIT
 
@@ -433,32 +434,27 @@ if [[ -z "${MODEL_VOLUME_ID}" || "${MODEL_VOLUME_ID}" == "None" ]]; then
 fi
 
 PARAMS_FILE="$(mktemp)"
+REMOTE_SCRIPT_WRAPPED="$(mktemp)"
+cat >"${REMOTE_SCRIPT_WRAPPED}" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+export MODEL_REPO_B64="$(b64 "${MODEL_REPO}")"
+export MODEL_FILENAME_B64="$(b64 "${MODEL_FILENAME}")"
+export HF_TOKEN_B64="$(b64 "${HF_TOKEN:-}")"
+export MOUNT_POINT_B64="$(b64 "${MOUNT_POINT}")"
+export FILESYSTEM_B64="$(b64 "${FILESYSTEM}")"
+EOF
+tail -n +2 "${REMOTE_SCRIPT}" >>"${REMOTE_SCRIPT_WRAPPED}"
+REMOTE_SCRIPT_B64="$(base64 -w 0 "${REMOTE_SCRIPT_WRAPPED}")"
 
-SCRIPT_LINES_JSON="$(jq -Rs 'split("\n") | map(select(length > 0))' "${REMOTE_SCRIPT}")"
 jq -n \
-  --arg repo_b64 "$(b64 "${MODEL_REPO}")" \
-  --arg filename_b64 "$(b64 "${MODEL_FILENAME}")" \
-  --arg token_b64 "$(b64 "${HF_TOKEN:-}")" \
-  --arg mount_b64 "$(b64 "${MOUNT_POINT}")" \
-  --arg fs_b64 "$(b64 "${FILESYSTEM}")" \
-  --argjson script_lines "${SCRIPT_LINES_JSON}" \
+  --arg remote_script_b64 "${REMOTE_SCRIPT_B64}" \
   '{
-    commands: (
-      [
-        "cat > /tmp/model-snapshot-helper-remote.sh <<'" + "EOF" + "'",
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "export MODEL_REPO_B64=\"" + $repo_b64 + "\"",
-        "export MODEL_FILENAME_B64=\"" + $filename_b64 + "\"",
-        "export HF_TOKEN_B64=\"" + $token_b64 + "\"",
-        "export MOUNT_POINT_B64=\"" + $mount_b64 + "\"",
-        "export FILESYSTEM_B64=\"" + $fs_b64 + "\""
-      ] + $script_lines + [
-        "EOF",
-        "chmod +x /tmp/model-snapshot-helper-remote.sh",
-        "/usr/bin/env bash /tmp/model-snapshot-helper-remote.sh"
-      ]
-    )
+    commands: [
+      "python3 -c '\''import base64, pathlib; pathlib.Path(\"/tmp/model-snapshot-helper-remote.sh\").write_bytes(base64.b64decode(\"" + $remote_script_b64 + "\"))'\''",
+      "chmod +x /tmp/model-snapshot-helper-remote.sh",
+      "/usr/bin/env bash /tmp/model-snapshot-helper-remote.sh"
+    ]
   }' >"${PARAMS_FILE}"
 
 echo "Preparing the model volume over SSM..."
