@@ -165,6 +165,31 @@ wait_for_ssm_online() {
   exit 1
 }
 
+wait_for_instance_profile_ready() {
+  local instance_profile_name="$1"
+  local arn=""
+  local attempt=0
+
+  while (( attempt < 30 )); do
+    arn="$(aws "${AWS_ARGS[@]}" iam get-instance-profile \
+      --instance-profile-name "${instance_profile_name}" \
+      --query 'InstanceProfile.Arn' \
+      --output text 2>/dev/null || true)"
+    if [[ -n "${arn}" && "${arn}" != "None" ]]; then
+      printf '%s\n' "${arn}"
+      return 0
+    fi
+    if (( attempt == 0 || attempt % 6 == 0 )); then
+      echo "Waiting for instance profile ${instance_profile_name} to propagate..."
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+
+  echo "Timed out waiting for instance profile ${instance_profile_name} to become readable." >&2
+  exit 1
+}
+
 wait_for_snapshot_completion() {
   local snapshot_id="$1"
   local state=""
@@ -342,6 +367,7 @@ HELPER_SG_ID=""
 MODEL_VOLUME_ID=""
 TEMP_CREATED_PROFILE="false"
 CREATE_PROFILE_ARGS=()
+HELPER_INSTANCE_PROFILE_ARN=""
 
 cleanup() {
   if [[ "${KEEP_HELPER_INSTANCE}" != "true" && -n "${INSTANCE_ID}" ]]; then
@@ -369,6 +395,8 @@ if ! aws "${AWS_ARGS[@]}" iam get-instance-profile --instance-profile-name "${HE
   TEMP_CREATED_PROFILE="true"
 fi
 
+HELPER_INSTANCE_PROFILE_ARN="$(wait_for_instance_profile_ready "${HELPER_INSTANCE_PROFILE_NAME}")"
+
 HELPER_SG_NAME="model-snapshot-helper-$(date +%Y%m%d%H%M%S)"
 HELPER_SG_ID="$(aws "${AWS_ARGS[@]}" ec2 create-security-group \
   --group-name "${HELPER_SG_NAME}" \
@@ -384,7 +412,7 @@ INSTANCE_ID="$(aws "${AWS_ARGS[@]}" ec2 run-instances \
   --instance-type "${HELPER_INSTANCE_TYPE}" \
   --subnet-id "${BACKEND_SUBNET_ID}" \
   --security-group-ids "${HELPER_SG_ID}" \
-  --iam-instance-profile "Name=${HELPER_INSTANCE_PROFILE_NAME}" \
+  --iam-instance-profile "Arn=${HELPER_INSTANCE_PROFILE_ARN}" \
   --metadata-options 'HttpEndpoint=enabled,HttpTokens=required,HttpPutResponseHopLimit=2' \
   --block-device-mappings "[{\"DeviceName\":\"/dev/sdf\",\"Ebs\":{\"VolumeSize\":${SIZE_GB},\"VolumeType\":\"gp3\",\"Encrypted\":true,\"DeleteOnTermination\":true}}]" \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=model-snapshot-helper},{Key=ManagedBy,Value=run-model-snapshot-job.sh},{Key=Role,Value=model-snapshot-helper}]" \
