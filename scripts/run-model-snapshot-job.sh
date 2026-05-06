@@ -445,13 +445,19 @@ jq -n \
   '{
     commands: (
       [
+        "cat > /tmp/model-snapshot-helper-remote.sh <<'" + "EOF" + "'",
+        "#!/usr/bin/env bash",
         "set -euo pipefail",
         "export MODEL_REPO_B64=\"" + $repo_b64 + "\"",
         "export MODEL_FILENAME_B64=\"" + $filename_b64 + "\"",
         "export HF_TOKEN_B64=\"" + $token_b64 + "\"",
         "export MOUNT_POINT_B64=\"" + $mount_b64 + "\"",
         "export FILESYSTEM_B64=\"" + $fs_b64 + "\""
-      ] + $script_lines
+      ] + $script_lines + [
+        "EOF",
+        "chmod +x /tmp/model-snapshot-helper-remote.sh",
+        "/usr/bin/env bash /tmp/model-snapshot-helper-remote.sh"
+      ]
     )
   }' >"${PARAMS_FILE}"
 
