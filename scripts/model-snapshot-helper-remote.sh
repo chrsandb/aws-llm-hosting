@@ -10,6 +10,7 @@ MODEL_FILENAME="$(decode_b64 "${MODEL_FILENAME_B64}")"
 HF_TOKEN="$(decode_b64 "${HF_TOKEN_B64:-}")"
 MOUNT_POINT="$(decode_b64 "${MOUNT_POINT_B64:-}")"
 FILESYSTEM="$(decode_b64 "${FILESYSTEM_B64:-}")"
+MODEL_VOLUME_ID="$(decode_b64 "${MODEL_VOLUME_ID_B64:-}")"
 
 MOUNT_POINT="${MOUNT_POINT:-/mnt/models}"
 FILESYSTEM="${FILESYSTEM:-ext4}"
@@ -17,8 +18,8 @@ TOOLS_VENV="/opt/aws-llm-hosting-tools"
 
 echo "[helper] Installing model snapshot prerequisites..."
 export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl e2fsprogs python3 python3-venv util-linux xfsprogs
+sudo env DEBIAN_FRONTEND=noninteractive apt-get update
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl e2fsprogs python3 python3-venv util-linux xfsprogs
 
 if [[ ! -x "${TOOLS_VENV}/bin/hf" ]]; then
   echo "[helper] Installing Hugging Face CLI..."
@@ -43,11 +44,32 @@ for tool in "${LSBLK_BIN}" "${FINDMNT_BIN}" "${BLKID_BIN}" "${MKFS_EXT4_BIN}" "$
 done
 
 echo "[helper] Detecting attached model volume..."
-DEVICE="$("${LSBLK_BIN}" -dnpo NAME,MOUNTPOINT,TYPE | awk '$3 == "disk" && $2 == "" { print $1 }' | tail -n1)"
-if [[ -z "${DEVICE}" || ! -b "${DEVICE}" ]]; then
-  echo "[helper] Could not detect the attached model volume." >&2
+if [[ -z "${MODEL_VOLUME_ID}" ]]; then
+  echo "[helper] MODEL_VOLUME_ID_B64 was not provided." >&2
   exit 1
 fi
+
+DEVICE=""
+for _ in $(seq 1 24); do
+  while IFS= read -r candidate; do
+    [[ -b "${candidate}" ]] || continue
+    serial="$(udevadm info --query=property --name "${candidate}" 2>/dev/null | sed -n 's/^ID_SERIAL=//p' | head -n1 || true)"
+    if [[ "${serial}" == vol* && "${serial#vol}" == "${MODEL_VOLUME_ID#vol-}" ]]; then
+      DEVICE="${candidate}"
+      break
+    fi
+  done < <("${LSBLK_BIN}" -dnpo NAME,TYPE | awk '$2 == "disk" { print $1 }')
+  [[ -n "${DEVICE}" ]] && break
+  echo "[helper] Waiting for attached model volume ${MODEL_VOLUME_ID} to appear as a local block device..."
+  sleep 5
+done
+
+if [[ -z "${DEVICE}" || ! -b "${DEVICE}" ]]; then
+  echo "[helper] Could not map EBS volume ${MODEL_VOLUME_ID} to a local block device." >&2
+  "${LSBLK_BIN}" -dnpo NAME,SIZE,TYPE,MOUNTPOINT >&2 || true
+  exit 1
+fi
+
 echo "[helper] Using device ${DEVICE}"
 
 EXISTING_FS="$(sudo "${BLKID_BIN}" -o value -s TYPE "${DEVICE}" 2>/dev/null || true)"
