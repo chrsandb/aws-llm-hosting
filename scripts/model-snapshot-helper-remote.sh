@@ -38,8 +38,10 @@ BLKID_BIN="$(command -v blkid || true)"
 MKFS_EXT4_BIN="$(command -v mkfs.ext4 || true)"
 MKFS_XFS_BIN="$(command -v mkfs.xfs || true)"
 UDEVADM_BIN="$(command -v udevadm || true)"
+READLINK_BIN="$(command -v readlink || true)"
+NVME_ID_BIN="$(command -v ebsnvme-id || true)"
 
-for tool in "${LSBLK_BIN}" "${FINDMNT_BIN}" "${BLKID_BIN}" "${MKFS_EXT4_BIN}" "${MKFS_XFS_BIN}" "${UDEVADM_BIN}"; do
+for tool in "${LSBLK_BIN}" "${FINDMNT_BIN}" "${BLKID_BIN}" "${MKFS_EXT4_BIN}" "${MKFS_XFS_BIN}" "${UDEVADM_BIN}" "${READLINK_BIN}"; do
   if [[ -z "${tool}" ]]; then
     echo "[helper] Missing required filesystem tool after install." >&2
     exit 1
@@ -52,16 +54,70 @@ if [[ -z "${MODEL_VOLUME_ID}" ]]; then
   exit 1
 fi
 
-DEVICE=""
-for _ in $(seq 1 24); do
+volume_matches() {
+  local value="${1:-}"
+  local normalized=""
+  local target_full="${MODEL_VOLUME_ID#vol-}"
+  local target_prefixed="vol${target_full}"
+
+  [[ -z "${value}" ]] && return 1
+  normalized="$(tr '[:upper:]' '[:lower:]' <<<"${value}")"
+  [[ "${normalized}" == *"${MODEL_VOLUME_ID}"* ]] && return 0
+  [[ "${normalized}" == *"${target_prefixed}"* ]] && return 0
+  [[ "${normalized}" == *"${target_full}"* ]] && return 0
+  return 1
+}
+
+detect_volume_device() {
+  local candidate=""
+  local serial=""
+  local props=""
+  local by_id=""
+
   while IFS= read -r candidate; do
     [[ -b "${candidate}" ]] || continue
-    serial="$("${UDEVADM_BIN}" info --query=property --name "${candidate}" 2>/dev/null | sed -n 's/^ID_SERIAL=//p' | head -n1 || true)"
-    if [[ "${serial}" == vol* && "${serial#vol}" == "${MODEL_VOLUME_ID#vol-}" ]]; then
-      DEVICE="${candidate}"
-      break
+
+    serial="$("${LSBLK_BIN}" -dn -o SERIAL "${candidate}" 2>/dev/null | head -n1 || true)"
+    if volume_matches "${serial}"; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+
+    props="$("${UDEVADM_BIN}" info --query=property --name "${candidate}" 2>/dev/null || true)"
+    while IFS= read -r serial; do
+      if volume_matches "${serial}"; then
+        printf '%s\n' "${candidate}"
+        return 0
+      fi
+    done < <(printf '%s\n' "${props}" | sed -nE 's/^(ID_SERIAL|ID_SERIAL_SHORT|ID_WWN|DM_NAME)=(.*)$/\2/p')
+
+    if [[ -n "${NVME_ID_BIN}" ]]; then
+      serial="$("${NVME_ID_BIN}" "${candidate}" 2>/dev/null | awk '/Volume ID:/ { print $3; exit }' || true)"
+      if volume_matches "${serial}"; then
+        printf '%s\n' "${candidate}"
+        return 0
+      fi
     fi
   done < <("${LSBLK_BIN}" -dnpo NAME,TYPE | awk '$2 == "disk" { print $1 }')
+
+  if [[ -d /dev/disk/by-id ]]; then
+    while IFS= read -r by_id; do
+      if volume_matches "${by_id}"; then
+        candidate="$("${READLINK_BIN}" -f "${by_id}" 2>/dev/null || true)"
+        if [[ -n "${candidate}" && -b "${candidate}" ]]; then
+          printf '%s\n' "${candidate}"
+          return 0
+        fi
+      fi
+    done < <(find /dev/disk/by-id -maxdepth 1 -type l 2>/dev/null | sort)
+  fi
+
+  return 1
+}
+
+DEVICE=""
+for _ in $(seq 1 24); do
+  DEVICE="$(detect_volume_device || true)"
   [[ -n "${DEVICE}" ]] && break
   echo "[helper] Waiting for attached model volume ${MODEL_VOLUME_ID} to appear as a local block device..."
   sleep 5
