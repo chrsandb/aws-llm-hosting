@@ -2,8 +2,9 @@ SHELL := /bin/bash
 
 TF_DIR ?= terraform
 PACKER_DIR ?= packer
-TFVARS ?= ../examples/dev.tfvars
+TFVARS ?= examples/dev.tfvars
 PACKER_VARS ?= backend.example.pkrvars.hcl
+TFVARS_ABS := $(abspath $(TFVARS))
 
 define require_cmd
 	@command -v $(1) >/dev/null 2>&1 || { echo "Missing required command: $(1). Run ./scripts/install-dependencies-debian-ubuntu.sh or install it manually."; exit 1; }
@@ -17,19 +18,19 @@ init:
 
 plan:
 	$(call require_cmd,terraform)
-	cd $(TF_DIR) && terraform plan -var-file=$(TFVARS)
+	cd $(TF_DIR) && terraform plan -var-file=$(TFVARS_ABS)
 
 apply:
 	$(call require_cmd,terraform)
-	cd $(TF_DIR) && terraform apply -var-file=$(TFVARS)
+	cd $(TF_DIR) && terraform apply -var-file=$(TFVARS_ABS)
 
 destroy:
 	$(call require_cmd,terraform)
-	cd $(TF_DIR) && terraform destroy -var-file=$(TFVARS)
+	cd $(TF_DIR) && terraform destroy -var-file=$(TFVARS_ABS)
 
 cleanup:
 	$(call require_cmd,terraform)
-	./scripts/cleanup-deployment.sh --tfvars $(TFVARS)
+	./scripts/cleanup-deployment.sh --tfvars $(TFVARS_ABS)
 
 fmt:
 	$(call require_cmd,terraform)
