@@ -8,3 +8,4 @@ packer/manifest.json
 *.retry
 *.log
 .DS_Store
+.hf.env
