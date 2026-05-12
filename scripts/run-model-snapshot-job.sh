@@ -91,6 +91,40 @@ parse_terraform_variable_default() {
   ' "${path}" | head -n1
 }
 
+resolve_hf_model_filename() {
+  local repo="$1"
+  local requested="$2"
+
+  python3 - "$repo" "$requested" <<'PY'
+import json
+import sys
+import urllib.request
+
+repo = sys.argv[1]
+requested = sys.argv[2]
+url = f"https://huggingface.co/api/models/{repo}/tree/main?recursive=0"
+
+try:
+    with urllib.request.urlopen(url, timeout=30) as response:
+        payload = json.load(response)
+except Exception:
+    print(requested)
+    sys.exit(0)
+
+paths = [item.get("path", "") for item in payload if isinstance(item, dict)]
+if requested in paths:
+    print(requested)
+    sys.exit(0)
+
+matches = [path for path in paths if path.endswith(requested)]
+if len(matches) == 1:
+    print(matches[0])
+    sys.exit(0)
+
+print(requested)
+PY
+}
+
 slugify() {
   tr '[:upper:]' '[:lower:]' <<<"$1" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g'
 }
@@ -358,6 +392,12 @@ if [[ -z "${MODEL_REPO}" || -z "${MODEL_FILENAME}" ]]; then
   exit 1
 fi
 
+RESOLVED_MODEL_FILENAME="$(resolve_hf_model_filename "${MODEL_REPO}" "${MODEL_FILENAME}")"
+if [[ "${RESOLVED_MODEL_FILENAME}" != "${MODEL_FILENAME}" ]]; then
+  echo "Resolved model filename ${MODEL_FILENAME} -> ${RESOLVED_MODEL_FILENAME}"
+  MODEL_FILENAME="${RESOLVED_MODEL_FILENAME}"
+fi
+
 if [[ -z "${SNAPSHOT_DESCRIPTION}" ]]; then
   SNAPSHOT_DESCRIPTION="$(derive_snapshot_description "${MODEL_REPO}" "${MODEL_FILENAME}")"
 fi
@@ -479,6 +519,8 @@ SNAPSHOT_ID="$(aws "${AWS_ARGS[@]}" ec2 create-snapshot \
 echo "Created snapshot request ${SNAPSHOT_ID}; polling AWS for progress..."
 wait_for_snapshot_completion "${SNAPSHOT_ID}"
 
+update_tfvars_string "model_filename" "${MODEL_FILENAME}" "${TFVARS}"
+update_tfvars_string "model_path" "/models/${MODEL_FILENAME}" "${TFVARS}"
 update_tfvars_string "model_ebs_snapshot_id" "${SNAPSHOT_ID}" "${TFVARS}"
 
 echo "Helper instance: ${INSTANCE_ID}"

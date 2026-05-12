@@ -24,8 +24,8 @@ Options:
   --device PATH                   Local block device path override if auto-detection is not wanted
   --mount-point PATH              Mount point, default: /mnt/models
   --filesystem TYPE               Filesystem to create if needed, default: ext4
-  --model-repo REPO               Hugging Face repo, for example unsloth/Qwen3.5-35B-A3B-GGUF
-  --model-filename FILE           Model file inside the repo, for example Q8_0.gguf
+  --model-repo REPO               Hugging Face repo, for example unsloth/Qwen3.6-35B-A3B-GGUF
+  --model-filename FILE           Model file inside the repo, for example Qwen3.6-35B-A3B-Q8_0.gguf
   --config FILE                   Shell-style config file. Supports HF_TOKEN, SNAPSHOT_DESCRIPTION, and model defaults.
   --hf-token TOKEN                Hugging Face token. Overrides config and env.
   --keep-volume                   Keep an auto-created volume attached after snapshot creation
@@ -112,6 +112,40 @@ run_hf() {
     echo "Missing Hugging Face CLI. Install dependencies with ./scripts/install-dependencies-debian-ubuntu.sh" >&2
     exit 1
   fi
+}
+
+resolve_hf_model_filename() {
+  local repo="$1"
+  local requested="$2"
+
+  python3 - "$repo" "$requested" <<'PY'
+import json
+import sys
+import urllib.request
+
+repo = sys.argv[1]
+requested = sys.argv[2]
+url = f"https://huggingface.co/api/models/{repo}/tree/main?recursive=0"
+
+try:
+    with urllib.request.urlopen(url, timeout=30) as response:
+        payload = json.load(response)
+except Exception:
+    print(requested)
+    sys.exit(0)
+
+paths = [item.get("path", "") for item in payload if isinstance(item, dict)]
+if requested in paths:
+    print(requested)
+    sys.exit(0)
+
+matches = [path for path in paths if path.endswith(requested)]
+if len(matches) == 1:
+    print(matches[0])
+    sys.exit(0)
+
+print(requested)
+PY
 }
 
 find_system_command() {
@@ -471,6 +505,12 @@ if [[ ! -b "${DEVICE}" ]]; then
 fi
 
 if [[ "${SNAPSHOT_ONLY}" != "true" ]]; then
+  RESOLVED_MODEL_FILENAME="$(resolve_hf_model_filename "${MODEL_REPO}" "${MODEL_FILENAME}")"
+  if [[ "${RESOLVED_MODEL_FILENAME}" != "${MODEL_FILENAME}" ]]; then
+    echo "Resolved model filename ${MODEL_FILENAME} -> ${RESOLVED_MODEL_FILENAME}"
+    MODEL_FILENAME="${RESOLVED_MODEL_FILENAME}"
+  fi
+
   ${SUDO} mkdir -p "${MOUNT_POINT}"
 
   EXISTING_FS="$(${SUDO} "${BLKID_BIN}" -o value -s TYPE "${DEVICE}" 2>/dev/null || true)"
@@ -527,6 +567,8 @@ echo "Created snapshot request ${SNAPSHOT_ID}; polling AWS for progress..."
 wait_for_snapshot_completion "${SNAPSHOT_ID}"
 
 if [[ -n "${TFVARS}" ]]; then
+  update_tfvars_string "model_filename" "${MODEL_FILENAME}" "${TFVARS}"
+  update_tfvars_string "model_path" "/models/${MODEL_FILENAME}" "${TFVARS}"
   update_tfvars_string "model_ebs_snapshot_id" "${SNAPSHOT_ID}" "${TFVARS}"
 fi
 
