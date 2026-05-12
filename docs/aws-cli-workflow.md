@@ -260,6 +260,8 @@ make plan TFVARS=examples/generated.prod.tfvars
 make apply TFVARS=examples/generated.prod.tfvars
 ```
 
+The Terraform `make` targets validate the tfvars file first and stop early if Packer-only keys such as `source_ami_id` were accidentally copied into `examples/generated.prod.tfvars`.
+
 ## 10. Post-Deploy Checks
 
 Check backend health:

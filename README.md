@@ -350,6 +350,8 @@ make plan TFVARS=examples/generated.prod.tfvars
 make apply TFVARS=examples/generated.prod.tfvars
 ```
 
+The Terraform `make` targets validate your tfvars file first and stop early if Packer-only keys such as `source_ami_id` were accidentally copied into `examples/generated.prod.tfvars`.
+
 Success signal: Terraform completes successfully and prints outputs, including the public API endpoint and internal ALB names.
 
 ### 12. Wait for the platform to become healthy
