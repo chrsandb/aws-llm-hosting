@@ -361,6 +361,8 @@ Important:
 
 Purpose: create the managed infrastructure for the deployment.
 
+Run this after Step 11 succeeds so you know at least one backend subnet can currently launch the required GPU instance type.
+
 ```bash
 make init
 make plan TFVARS=examples/generated.prod.tfvars
@@ -389,7 +391,7 @@ Optional backend check:
 
 Success signal: the backend health endpoint returns HTTP 200 and the ECS service stays stable.
 
-### 13. Test the public endpoint
+### 14. Test the public endpoint
 
 Purpose: confirm the public LiteLLM API is reachable.
 
