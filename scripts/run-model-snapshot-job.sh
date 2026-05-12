@@ -16,7 +16,7 @@ Options:
   --config FILE                       Optional shell-style config. Supports HF_TOKEN, SNAPSHOT_DESCRIPTION, MODEL_REPO, MODEL_FILENAME, MOUNT_POINT, FILESYSTEM
   --profile PROFILE                   AWS CLI profile
   --helper-ami-id AMI_ID              Helper EC2 AMI, default: ami-00e2c2ccdcd58e2ba
-  --helper-instance-type TYPE         Helper EC2 instance type, default: t3.small
+  --helper-instance-type TYPE         Helper EC2 instance type, default: t3.large
   --helper-instance-profile-name NAME Reusable EC2 instance profile, default: llm-model-snapshot-helper
   --size-gb SIZE                      Model volume size in GiB, default: 100
   --filesystem TYPE                   Volume filesystem, default: ext4
@@ -297,7 +297,7 @@ PROFILE=""
 TFVARS=""
 CONFIG_FILE=""
 HELPER_AMI_ID="ami-00e2c2ccdcd58e2ba"
-HELPER_INSTANCE_TYPE="t3.small"
+HELPER_INSTANCE_TYPE="t3.large"
 HELPER_INSTANCE_PROFILE_NAME="llm-model-snapshot-helper"
 SIZE_GB="100"
 FILESYSTEM="ext4"
@@ -502,6 +502,7 @@ echo "Preparing the model volume over SSM..."
 COMMAND_ID="$(aws "${AWS_ARGS[@]}" ssm send-command \
   --instance-ids "${INSTANCE_ID}" \
   --document-name AWS-RunShellScript \
+  --timeout-seconds 14400 \
   --parameters "file://${PARAMS_FILE}" \
   --comment "Prepare model volume for snapshot" \
   --query 'Command.CommandId' \

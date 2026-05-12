@@ -15,6 +15,7 @@ MODEL_VOLUME_ID="$(decode_b64 "${MODEL_VOLUME_ID_B64:-}")"
 MOUNT_POINT="${MOUNT_POINT:-/mnt/models}"
 FILESYSTEM="${FILESYSTEM:-ext4}"
 TOOLS_VENV="/opt/aws-llm-hosting-tools"
+export HF_HUB_DISABLE_XET=1
 
 echo "[helper] Installing model snapshot prerequisites..."
 export DEBIAN_FRONTEND=noninteractive
