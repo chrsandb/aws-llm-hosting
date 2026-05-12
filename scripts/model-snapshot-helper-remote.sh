@@ -18,8 +18,10 @@ TOOLS_VENV="/opt/aws-llm-hosting-tools"
 
 echo "[helper] Installing model snapshot prerequisites..."
 export DEBIAN_FRONTEND=noninteractive
-sudo env DEBIAN_FRONTEND=noninteractive apt-get update
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl e2fsprogs python3 python3-venv util-linux xfsprogs
+export NEEDRESTART_MODE=a
+export APT_LISTCHANGES_FRONTEND=none
+sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none apt-get update
+sudo env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a APT_LISTCHANGES_FRONTEND=none apt-get install -y ca-certificates curl e2fsprogs python3 python3-venv util-linux xfsprogs
 
 if [[ ! -x "${TOOLS_VENV}/bin/hf" ]]; then
   echo "[helper] Installing Hugging Face CLI..."
@@ -35,8 +37,9 @@ FINDMNT_BIN="$(command -v findmnt || true)"
 BLKID_BIN="$(command -v blkid || true)"
 MKFS_EXT4_BIN="$(command -v mkfs.ext4 || true)"
 MKFS_XFS_BIN="$(command -v mkfs.xfs || true)"
+UDEVADM_BIN="$(command -v udevadm || true)"
 
-for tool in "${LSBLK_BIN}" "${FINDMNT_BIN}" "${BLKID_BIN}" "${MKFS_EXT4_BIN}" "${MKFS_XFS_BIN}"; do
+for tool in "${LSBLK_BIN}" "${FINDMNT_BIN}" "${BLKID_BIN}" "${MKFS_EXT4_BIN}" "${MKFS_XFS_BIN}" "${UDEVADM_BIN}"; do
   if [[ -z "${tool}" ]]; then
     echo "[helper] Missing required filesystem tool after install." >&2
     exit 1
@@ -53,7 +56,7 @@ DEVICE=""
 for _ in $(seq 1 24); do
   while IFS= read -r candidate; do
     [[ -b "${candidate}" ]] || continue
-    serial="$(udevadm info --query=property --name "${candidate}" 2>/dev/null | sed -n 's/^ID_SERIAL=//p' | head -n1 || true)"
+    serial="$("${UDEVADM_BIN}" info --query=property --name "${candidate}" 2>/dev/null | sed -n 's/^ID_SERIAL=//p' | head -n1 || true)"
     if [[ "${serial}" == vol* && "${serial#vol}" == "${MODEL_VOLUME_ID#vol-}" ]]; then
       DEVICE="${candidate}"
       break
