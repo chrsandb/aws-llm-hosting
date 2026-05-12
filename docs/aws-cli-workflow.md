@@ -252,7 +252,17 @@ Then run the model snapshot job from your local machine:
   --config ./.hf.env
 ```
 
-## 9. Run Terraform
+## 9. Probe Backend Capacity
+
+```bash
+make capacity-check TFVARS=examples/generated.prod.tfvars
+```
+
+This performs a real short-lived launch probe for the backend instance type in each candidate backend subnet. It is more meaningful than a dry-run because AWS does not expose a reliable read-only API for live On-Demand GPU capacity by AZ.
+
+If only some subnets succeed, consider temporarily prioritizing or restricting `backend_private_subnet_ids` to those AZs for the initial deployment.
+
+## 10. Run Terraform
 
 ```bash
 make init
@@ -262,7 +272,7 @@ make apply TFVARS=examples/generated.prod.tfvars
 
 The Terraform `make` targets validate the tfvars file first and stop early if Packer-only keys such as `source_ami_id` were accidentally copied into `examples/generated.prod.tfvars`.
 
-## 10. Post-Deploy Checks
+## 11. Post-Deploy Checks
 
 Check backend health:
 

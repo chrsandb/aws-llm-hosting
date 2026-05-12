@@ -15,6 +15,7 @@ define validate_tfvars
 endef
 
 .PHONY: init plan apply destroy cleanup fmt validate packer-init packer-build
+.PHONY: capacity-check
 
 init:
 	$(call require_cmd,terraform)
@@ -38,6 +39,10 @@ destroy:
 cleanup:
 	$(call require_cmd,terraform)
 	./scripts/cleanup-deployment.sh --tfvars $(TFVARS_ABS)
+
+capacity-check:
+	$(call require_cmd,aws)
+	./scripts/check-backend-capacity.sh --region $${AWS_REGION:-eu-north-1} --tfvars $(TFVARS_ABS)
 
 fmt:
 	$(call require_cmd,terraform)

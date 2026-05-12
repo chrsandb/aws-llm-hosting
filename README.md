@@ -340,7 +340,24 @@ Use the suggested public `/32` as the default choice unless you intentionally wa
 
 Success signal: the file contains no placeholder AMI or snapshot IDs.
 
-### 11. Run Terraform
+### 11. Probe Backend Capacity
+
+Purpose: check live backend GPU capacity in your backend subnets before creating the full stack.
+
+```bash
+make capacity-check TFVARS=examples/generated.prod.tfvars
+```
+
+This launches and immediately terminates a short-lived probe instance in each candidate backend private subnet. It is the most useful pre-check because AWS does not provide a reliable read-only API for live On-Demand GPU capacity by AZ.
+
+Success signal: at least one backend subnet reports a successful probe launch.
+
+Important:
+
+- this is still a point-in-time check; capacity can change before `terraform apply`
+- if only some subnets succeed, consider temporarily prioritizing or restricting `backend_private_subnet_ids` to those AZs for the initial deployment
+
+### 12. Run Terraform
 
 Purpose: create the managed infrastructure for the deployment.
 
@@ -354,7 +371,7 @@ The Terraform `make` targets validate your tfvars file first and stop early if P
 
 Success signal: Terraform completes successfully and prints outputs, including the public API endpoint and internal ALB names.
 
-### 12. Wait for the platform to become healthy
+### 13. Wait for the platform to become healthy
 
 Purpose: confirm ACM, ECS, and the backend ASG all stabilize before testing clients.
 
