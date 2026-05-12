@@ -151,6 +151,14 @@ Review the generated file and then fill in:
 - admin CIDRs
 - any overrides for frontend count or llama settings
 
+To suggest `admin_allowed_cidrs`, prefer your current public IP first:
+
+```bash
+./scripts/suggest-admin-cidrs.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars
+```
+
 ## 6. Create or Rotate the LiteLLM Master Key
 
 ```bash

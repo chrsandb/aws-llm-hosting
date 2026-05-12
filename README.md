@@ -328,6 +328,16 @@ Fill in at least:
 - `admin_allowed_cidrs`
 - any environment-specific overrides
 
+If you want a quick suggestion for `admin_allowed_cidrs`, run:
+
+```bash
+./scripts/suggest-admin-cidrs.sh \
+  --region eu-north-1 \
+  --tfvars examples/generated.prod.tfvars
+```
+
+Use the suggested public `/32` as the default choice unless you intentionally want to allow a private/VPN CIDR instead.
+
 Success signal: the file contains no placeholder AMI or snapshot IDs.
 
 ### 11. Run Terraform
