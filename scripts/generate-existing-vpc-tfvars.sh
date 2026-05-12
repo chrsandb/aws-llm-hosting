@@ -102,8 +102,8 @@ assume_existing_vpc_routing = true
 # Fill these in after AMI and model preparation.
 backend_ami_id        = "ami-REPLACE_ME"
 model_ebs_snapshot_id = "snap-REPLACE_ME"
-model_repo            = "unsloth/Qwen3.6-35B-A3B-GGUF"
-model_filename        = "UD-Q6_K_XL.gguf"
-model_alias           = "qwen3.6-35b-a3b"
-model_path            = "/models/UD-Q6_K_XL.gguf"
+model_repo            = "unsloth/Qwen3.5-35B-A3B-GGUF"
+model_filename        = "Q8_0.gguf"
+model_alias           = "qwen3.5-35b-a3b"
+model_path            = "/models/Q8_0.gguf"
 EOF

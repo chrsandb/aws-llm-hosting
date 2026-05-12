@@ -116,25 +116,25 @@ variable "backend_ami_id" {
 variable "model_repo" {
   description = "Model repository identifier."
   type        = string
-  default     = "unsloth/Qwen3.6-35B-A3B-GGUF"
+  default     = "unsloth/Qwen3.5-35B-A3B-GGUF"
 }
 
 variable "model_filename" {
   description = "Model GGUF file name."
   type        = string
-  default     = "UD-Q6_K_XL.gguf"
+  default     = "Q8_0.gguf"
 }
 
 variable "model_alias" {
   description = "Friendly model alias exposed through LiteLLM."
   type        = string
-  default     = "qwen3.6-35b-a3b"
+  default     = "qwen3.5-35b-a3b"
 }
 
 variable "model_path" {
   description = "Absolute path to the GGUF file on backend instances."
   type        = string
-  default     = "/models/UD-Q6_K_XL.gguf"
+  default     = "/models/Q8_0.gguf"
 }
 
 variable "model_source" {

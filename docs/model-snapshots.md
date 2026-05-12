@@ -32,9 +32,9 @@ That file can contain:
 4. Let it prepare the model volume over SSM, create the snapshot, update your tfvars file, and terminate the helper.
 5. Confirm that your tfvars file now contains `model_ebs_snapshot_id = "snap-..."`.
 
-For the default `unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL` workflow, `100` GB is a reasonable starting point:
+For the default `unsloth/Qwen3.5-35B-A3B-GGUF:Q8_0` workflow, `100` GB is a reasonable starting point:
 
-- the model file is roughly 30 GB
+- the model file is roughly 35 to 40 GB
 - this leaves room for a second version during update or rollback work
 - it avoids over-allocating the initial volume
 

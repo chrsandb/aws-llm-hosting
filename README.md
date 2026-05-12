@@ -18,7 +18,7 @@ Main components:
 - ECS Fargate frontend
 - Internal backend ALB
 - Auto Scaling Group of private GPU instances
-- `llama.cpp` CUDA server for `unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL`
+- `llama.cpp` CUDA server for `unsloth/Qwen3.5-35B-A3B-GGUF:Q8_0`
 
 The default target is `eu-north-1` and the baseline shape is one private `g6e.2xlarge` backend instance, suitable for roughly 10 developers with configurable scale-out.
 

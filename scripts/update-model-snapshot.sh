@@ -24,8 +24,8 @@ Options:
   --device PATH                   Local block device path override if auto-detection is not wanted
   --mount-point PATH              Mount point, default: /mnt/models
   --filesystem TYPE               Filesystem to create if needed, default: ext4
-  --model-repo REPO               Hugging Face repo, for example unsloth/Qwen3.6-35B-A3B-GGUF
-  --model-filename FILE           Model file inside the repo, for example UD-Q6_K_XL.gguf
+  --model-repo REPO               Hugging Face repo, for example unsloth/Qwen3.5-35B-A3B-GGUF
+  --model-filename FILE           Model file inside the repo, for example Q8_0.gguf
   --config FILE                   Shell-style config file. Supports HF_TOKEN, SNAPSHOT_DESCRIPTION, and model defaults.
   --hf-token TOKEN                Hugging Face token. Overrides config and env.
   --keep-volume                   Keep an auto-created volume attached after snapshot creation
