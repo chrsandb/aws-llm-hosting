@@ -6,3 +6,8 @@ data "aws_subnet" "frontend_private" {
   for_each = toset(var.frontend_private_subnet_ids)
   id       = each.value
 }
+
+resource "random_password" "postgres" {
+  length  = 32
+  special = false
+}

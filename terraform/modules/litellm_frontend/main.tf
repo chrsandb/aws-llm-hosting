@@ -1,25 +1,69 @@
-resource "random_password" "postgres" {
-  length  = 32
-  special = false
-}
-
 resource "random_password" "master_key" {
   count   = var.create_litellm_master_key_secret ? 1 : 0
   length  = 48
   special = false
 }
 
+locals {
+  postgres_secret_name = "${var.name_prefix}/litellm/postgres"
+}
+
+data "external" "existing_postgres_secret" {
+  program = ["bash", "${path.module}/scripts/lookup-secret.sh"]
+
+  query = {
+    name   = local.postgres_secret_name
+    region = var.aws_region
+  }
+}
+
+locals {
+  existing_postgres_secret_arn = try(data.external.existing_postgres_secret.result.arn, "")
+  postgres_secret_exists       = try(data.external.existing_postgres_secret.result.exists, "false") == "true"
+  postgres_secret_is_pending   = try(data.external.existing_postgres_secret.result.scheduled_for_deletion, "false") == "true"
+  postgres_secret_lookup_error = try(data.external.existing_postgres_secret.result.lookup_error, "")
+  create_postgres_secret       = !local.postgres_secret_exists
+  postgres_secret_arn          = local.create_postgres_secret ? aws_secretsmanager_secret.postgres[0].arn : local.existing_postgres_secret_arn
+}
+
+resource "terraform_data" "postgres_secret_validation" {
+  lifecycle {
+    precondition {
+      condition     = local.postgres_secret_lookup_error == ""
+      error_message = "Unable to query existing Postgres secret ${local.postgres_secret_name}. Check Secrets Manager permissions and AWS access. Details: ${local.postgres_secret_lookup_error}"
+    }
+
+    precondition {
+      condition     = !local.postgres_secret_is_pending
+      error_message = "The Postgres secret exists but is scheduled for deletion. Restore it in Secrets Manager before applying."
+    }
+
+    precondition {
+      condition     = var.database_mode == "rds" || var.postgres_host_override != null
+      error_message = "postgres_host_override must be set when database_mode is ec2_postgres."
+    }
+  }
+
+  input = local.postgres_secret_name
+}
+
+moved {
+  from = aws_secretsmanager_secret.postgres
+  to   = aws_secretsmanager_secret.postgres[0]
+}
+
 resource "aws_secretsmanager_secret" "postgres" {
-  name = "${var.name_prefix}/litellm/postgres"
+  count = local.create_postgres_secret ? 1 : 0
+  name  = local.postgres_secret_name
 }
 
 resource "aws_secretsmanager_secret_version" "postgres" {
-  secret_id = aws_secretsmanager_secret.postgres.id
+  secret_id = local.create_postgres_secret ? aws_secretsmanager_secret.postgres[0].id : local.existing_postgres_secret_arn
   secret_string = jsonencode({
     username = var.postgres_username
-    password = random_password.postgres.result
+    password = var.postgres_password
     dbname   = var.postgres_database_name
-    url      = "postgresql://${var.postgres_username}:${random_password.postgres.result}@${aws_db_instance.this.address}:5432/${var.postgres_database_name}"
+    url      = "postgresql://${var.postgres_username}:${var.postgres_password}@${local.postgres_host}:5432/${var.postgres_database_name}"
   })
 }
 
@@ -49,12 +93,18 @@ resource "terraform_data" "master_key_validation" {
   input = local.master_key_secret_arn
 }
 
+locals {
+  postgres_host = var.database_mode == "rds" ? aws_db_instance.this[0].address : var.postgres_host_override
+}
+
 resource "aws_db_subnet_group" "this" {
+  count      = var.database_mode == "rds" ? 1 : 0
   name       = "${var.name_prefix}-litellm"
   subnet_ids = var.private_subnet_ids
 }
 
 resource "aws_db_instance" "this" {
+  count                   = var.database_mode == "rds" ? 1 : 0
   identifier              = "${var.name_prefix}-litellm"
   engine                  = "postgres"
   engine_version          = "16.3"
@@ -62,9 +112,9 @@ resource "aws_db_instance" "this" {
   allocated_storage       = var.postgres_allocated_storage
   storage_type            = "gp3"
   username                = var.postgres_username
-  password                = random_password.postgres.result
+  password                = var.postgres_password
   db_name                 = var.postgres_database_name
-  db_subnet_group_name    = aws_db_subnet_group.this.name
+  db_subnet_group_name    = aws_db_subnet_group.this[0].name
   vpc_security_group_ids  = [var.postgres_security_group_id]
   multi_az                = false
   publicly_accessible     = false
@@ -274,7 +324,7 @@ resource "aws_ecs_task_definition" "this" {
         },
         {
           name      = "DATABASE_URL"
-          valueFrom = "${aws_secretsmanager_secret.postgres.arn}:url::"
+          valueFrom = "${local.postgres_secret_arn}:url::"
         }
       ]
       logConfiguration = {

@@ -4,6 +4,7 @@ TF_DIR ?= terraform
 PACKER_DIR ?= packer
 TFVARS ?= examples/dev.tfvars
 PACKER_VARS ?= backend.example.pkrvars.hcl
+APPLY_ARGS ?=
 TFVARS_ABS := $(abspath $(TFVARS))
 
 define require_cmd
@@ -14,7 +15,7 @@ define validate_tfvars
 	@./scripts/validate-terraform-tfvars.sh --tfvars $(TFVARS_ABS)
 endef
 
-.PHONY: init plan apply destroy cleanup fmt validate packer-init packer-build
+.PHONY: init plan apply apply-az-fallback destroy cleanup fmt validate packer-init packer-build
 .PHONY: capacity-check
 
 init:
@@ -30,6 +31,11 @@ apply:
 	$(call require_cmd,terraform)
 	$(validate_tfvars)
 	cd $(TF_DIR) && terraform apply -var-file=$(TFVARS_ABS)
+
+apply-az-fallback:
+	$(call require_cmd,terraform)
+	$(validate_tfvars)
+	./scripts/apply-with-az-fallback.sh --terraform-dir $(TF_DIR) --tfvars $(TFVARS_ABS) --region $${AWS_REGION:-eu-north-1} -- $(APPLY_ARGS)
 
 destroy:
 	$(call require_cmd,terraform)

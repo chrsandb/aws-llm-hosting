@@ -1,5 +1,6 @@
 locals {
-  name_prefix = "${var.project_name}-${var.environment}"
+  name_prefix            = "${var.project_name}-${var.environment}"
+  postgres_ec2_subnet_id = var.postgres_ec2_subnet_id != null ? var.postgres_ec2_subnet_id : var.frontend_private_subnet_ids[0]
 
   model_volume_enabled = var.model_source == "ebs_snapshot"
 
@@ -50,6 +51,11 @@ resource "terraform_data" "root_validations" {
     precondition {
       condition     = var.model_source != "ebs_snapshot" || var.model_ebs_snapshot_id != null
       error_message = "model_ebs_snapshot_id must be provided when model_source is ebs_snapshot."
+    }
+
+    precondition {
+      condition     = var.database_mode != "ec2_postgres" || length(var.frontend_private_subnet_ids) > 0
+      error_message = "At least one frontend private subnet is required when database_mode is ec2_postgres."
     }
   }
 

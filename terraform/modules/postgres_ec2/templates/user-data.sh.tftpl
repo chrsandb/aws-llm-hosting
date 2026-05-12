@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y postgresql postgresql-contrib util-linux rsync ca-certificates
+
+ROOT_SOURCE="$(findmnt -n -o SOURCE /)"
+ROOT_DISK="/dev/$(lsblk -no PKNAME "$${ROOT_SOURCE}" | head -n1)"
+DATA_DEVICE=""
+
+for _ in $(seq 1 24); do
+  while read -r candidate type; do
+    if [[ "$${type}" == "disk" && "$${candidate}" != "$${ROOT_DISK}" ]]; then
+      DATA_DEVICE="$${candidate}"
+      break
+    fi
+  done < <(lsblk -dnpo NAME,TYPE)
+
+  [[ -n "$${DATA_DEVICE}" ]] && break
+  sleep 5
+done
+
+if [[ -z "$${DATA_DEVICE}" ]]; then
+  echo "Could not detect attached Postgres data volume." >&2
+  exit 1
+fi
+
+if ! blkid "$${DATA_DEVICE}" >/dev/null 2>&1; then
+  mkfs.ext4 -F "$${DATA_DEVICE}"
+fi
+
+mkdir -p /var/lib/postgresql-data
+UUID="$(blkid -s UUID -o value "$${DATA_DEVICE}")"
+if ! grep -q "$${UUID}" /etc/fstab; then
+  echo "UUID=$${UUID} /var/lib/postgresql-data ext4 defaults,nofail 0 2" >> /etc/fstab
+fi
+mountpoint -q /var/lib/postgresql-data || mount /var/lib/postgresql-data
+
+PG_VERSION="$(ls /etc/postgresql | sort -V | tail -n1)"
+PG_CONF_DIR="/etc/postgresql/$${PG_VERSION}/main"
+PG_DATA_DIR="/var/lib/postgresql-data/$${PG_VERSION}/main"
+
+systemctl stop postgresql
+
+if [[ ! -d "$${PG_DATA_DIR}" ]]; then
+  mkdir -p "/var/lib/postgresql-data/$${PG_VERSION}"
+  rsync -a "/var/lib/postgresql/$${PG_VERSION}/" "/var/lib/postgresql-data/$${PG_VERSION}/"
+fi
+
+chown -R postgres:postgres /var/lib/postgresql-data
+
+if grep -q "^#\\?data_directory" "$${PG_CONF_DIR}/postgresql.conf"; then
+  sed -i "s|^#\\?data_directory.*|data_directory = '$${PG_DATA_DIR}'|" "$${PG_CONF_DIR}/postgresql.conf"
+else
+  echo "data_directory = '$${PG_DATA_DIR}'" >> "$${PG_CONF_DIR}/postgresql.conf"
+fi
+
+if grep -q "^#\\?listen_addresses" "$${PG_CONF_DIR}/postgresql.conf"; then
+  sed -i "s|^#\\?listen_addresses.*|listen_addresses = '*'|" "$${PG_CONF_DIR}/postgresql.conf"
+else
+  echo "listen_addresses = '*'" >> "$${PG_CONF_DIR}/postgresql.conf"
+fi
+
+for cidr in ${allowed_cidrs}; do
+  if ! grep -q "host[[:space:]]\+all[[:space:]]\+all[[:space:]]\+$${cidr}[[:space:]]\+scram-sha-256" "$${PG_CONF_DIR}/pg_hba.conf"; then
+    echo "host all all $${cidr} scram-sha-256" >> "$${PG_CONF_DIR}/pg_hba.conf"
+  fi
+done
+
+systemctl start postgresql
+systemctl enable postgresql
+
+sudo -u postgres psql <<SQL
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${postgres_username}') THEN
+    CREATE ROLE ${postgres_username} LOGIN PASSWORD '${postgres_password}';
+  ELSE
+    ALTER ROLE ${postgres_username} WITH LOGIN PASSWORD '${postgres_password}';
+  END IF;
+END
+$$;
+SQL
+
+sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${postgres_database_name}'" | grep -q 1 || \
+  sudo -u postgres createdb -O "${postgres_username}" "${postgres_database_name}"

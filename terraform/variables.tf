@@ -251,6 +251,17 @@ variable "frontend_desired_count" {
   default     = 2
 }
 
+variable "database_mode" {
+  description = "Database implementation for LiteLLM metadata. Supported values: rds, ec2_postgres."
+  type        = string
+  default     = "rds"
+
+  validation {
+    condition     = contains(["rds", "ec2_postgres"], var.database_mode)
+    error_message = "database_mode must be one of rds or ec2_postgres."
+  }
+}
+
 variable "postgres_instance_class" {
   description = "RDS instance class for LiteLLM metadata database."
   type        = string
@@ -273,6 +284,48 @@ variable "postgres_username" {
   description = "LiteLLM PostgreSQL admin username."
   type        = string
   default     = "litellm"
+}
+
+variable "postgres_ec2_instance_type" {
+  description = "EC2 instance type when database_mode is ec2_postgres."
+  type        = string
+  default     = "t3.small"
+}
+
+variable "postgres_ec2_ami_id" {
+  description = "Optional AMI ID override for the EC2 Postgres host. When null, use the latest Ubuntu 24.04 x86_64 AMI from the public SSM parameter."
+  type        = string
+  default     = null
+}
+
+variable "postgres_ec2_subnet_id" {
+  description = "Optional frontend private subnet ID override for the EC2 Postgres host."
+  type        = string
+  default     = null
+}
+
+variable "postgres_ec2_volume_size" {
+  description = "Data volume size in GiB when database_mode is ec2_postgres."
+  type        = number
+  default     = 40
+}
+
+variable "postgres_ec2_volume_type" {
+  description = "Data volume type when database_mode is ec2_postgres."
+  type        = string
+  default     = "gp3"
+}
+
+variable "postgres_ec2_volume_iops" {
+  description = "Data volume IOPS when database_mode is ec2_postgres."
+  type        = number
+  default     = 3000
+}
+
+variable "postgres_ec2_volume_throughput" {
+  description = "Data volume throughput in MiB/s when database_mode is ec2_postgres."
+  type        = number
+  default     = 125
 }
 
 variable "create_litellm_master_key_secret" {

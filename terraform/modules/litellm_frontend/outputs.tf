@@ -23,5 +23,5 @@ output "litellm_master_key_secret_arn" {
 }
 
 output "postgres_secret_arn" {
-  value = aws_secretsmanager_secret.postgres.arn
+  value = local.postgres_secret_arn
 }

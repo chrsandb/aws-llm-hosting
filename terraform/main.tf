@@ -75,11 +75,14 @@ module "litellm_frontend" {
   frontend_task_cpu                      = var.frontend_task_cpu
   frontend_task_memory                   = var.frontend_task_memory
   desired_count                          = var.frontend_desired_count
+  database_mode                          = var.database_mode
   postgres_security_group_id             = module.security_groups.postgres_security_group_id
   postgres_instance_class                = var.postgres_instance_class
   postgres_allocated_storage             = var.postgres_allocated_storage
   postgres_database_name                 = var.postgres_database_name
   postgres_username                      = var.postgres_username
+  postgres_password                      = random_password.postgres.result
+  postgres_host_override                 = var.database_mode == "ec2_postgres" ? try(module.postgres_ec2[0].private_ip, null) : null
   create_litellm_master_key_secret       = var.create_litellm_master_key_secret
   existing_litellm_master_key_secret_arn = var.existing_litellm_master_key_secret_arn
   ecs_task_execution_role_arn            = module.iam.ecs_task_execution_role_arn
@@ -92,6 +95,28 @@ module "litellm_frontend" {
   enable_redis                           = var.enable_redis
   redis_node_type                        = var.redis_node_type
   redis_security_group_id                = module.security_groups.redis_security_group_id
+}
+
+module "postgres_ec2" {
+  count  = var.database_mode == "ec2_postgres" ? 1 : 0
+  source = "./modules/postgres_ec2"
+
+  name_prefix                   = local.name_prefix
+  aws_region                    = var.aws_region
+  vpc_id                        = module.network_inputs.frontend_vpc_id
+  subnet_id                     = local.postgres_ec2_subnet_id
+  security_group_id             = module.security_groups.postgres_security_group_id
+  frontend_private_subnet_cidrs = [for subnet in data.aws_subnet.frontend_private : subnet.cidr_block]
+  postgres_database_name        = var.postgres_database_name
+  postgres_username             = var.postgres_username
+  postgres_password             = random_password.postgres.result
+  instance_type                 = var.postgres_ec2_instance_type
+  ami_id                        = var.postgres_ec2_ami_id
+  volume_size                   = var.postgres_ec2_volume_size
+  volume_type                   = var.postgres_ec2_volume_type
+  volume_iops                   = var.postgres_ec2_volume_iops
+  volume_throughput             = var.postgres_ec2_volume_throughput
+  tags                          = local.tags
 }
 
 module "backend_asg" {

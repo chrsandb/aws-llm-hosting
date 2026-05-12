@@ -62,6 +62,10 @@ variable "desired_count" {
   type = number
 }
 
+variable "database_mode" {
+  type = string
+}
+
 variable "postgres_security_group_id" {
   type = string
 }
@@ -80,6 +84,16 @@ variable "postgres_database_name" {
 
 variable "postgres_username" {
   type = string
+}
+
+variable "postgres_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "postgres_host_override" {
+  type    = string
+  default = null
 }
 
 variable "create_litellm_master_key_secret" {

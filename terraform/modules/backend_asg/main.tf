@@ -148,7 +148,7 @@ resource "aws_autoscaling_policy" "step_backend_latency" {
   autoscaling_group_name = aws_autoscaling_group.this.name
   adjustment_type        = "ChangeInCapacity"
   policy_type            = "StepScaling"
-  cooldown               = 300
+  estimated_instance_warmup = 300
 
   step_adjustment {
     metric_interval_lower_bound = 0
