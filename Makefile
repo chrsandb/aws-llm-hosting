@@ -40,7 +40,7 @@ apply-az-fallback:
 destroy:
 	$(call require_cmd,terraform)
 	$(validate_tfvars)
-	cd $(TF_DIR) && terraform destroy -var-file=$(TFVARS_ABS)
+	bash ./scripts/destroy-preserve-secrets.sh --terraform-dir $(TF_DIR) --tfvars $(TFVARS_ABS)
 
 cleanup:
 	$(call require_cmd,terraform)

@@ -118,6 +118,16 @@ jq -n \
             | .SubnetId
           )
       ),
+      public_route_table_ids: (
+        $subnets.Subnets
+        | map(
+            . as $subnet
+            | route_table_for_subnet(.SubnetId) as $rt
+            | select((.MapPublicIpOnLaunch == true) or has_igw_route($rt))
+            | ($rt.RouteTableId // empty)
+          )
+        | unique
+      ),
       private_subnet_ids: (
         $subnets.Subnets
         | map(
@@ -126,6 +136,16 @@ jq -n \
             | select(((.MapPublicIpOnLaunch == true) or has_igw_route($rt)) | not)
             | .SubnetId
           )
+      ),
+      private_route_table_ids: (
+        $subnets.Subnets
+        | map(
+            . as $subnet
+            | route_table_for_subnet(.SubnetId) as $rt
+            | select(((.MapPublicIpOnLaunch == true) or has_igw_route($rt)) | not)
+            | ($rt.RouteTableId // empty)
+          )
+        | unique
       ),
       route_table_ids: (
         $route_tables.RouteTables | map(.RouteTableId) | unique

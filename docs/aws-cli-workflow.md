@@ -81,7 +81,7 @@ This returns:
 
 - VPC CIDR and tags
 - subnet IDs and inferred public/private classification
-- associated route table IDs
+- route table IDs associated with those selected subnet roles
 
 ## 3. Register the Domain and Decide Hosted Zone Ownership
 
@@ -148,8 +148,15 @@ Review the generated file and then fill in:
 
 - `backend_ami_id` after step 7
 - `model_ebs_snapshot_id` after step 8
+- `database_mode` as `rds` or `ec2_postgres`
 - admin CIDRs
 - any overrides for frontend count or llama settings
+
+Database mode guidance:
+
+- `rds` is the default and keeps the managed PostgreSQL deployment path
+- `ec2_postgres` is the fallback for accounts where managed RDS creation is blocked by org policy or SCPs
+- if you use `ec2_postgres`, review `postgres_ec2_instance_type`, `postgres_ec2_subnet_id`, and `postgres_ec2_volume_size`
 
 To suggest `admin_allowed_cidrs`, prefer your current public IP first:
 

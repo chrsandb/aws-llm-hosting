@@ -17,10 +17,16 @@ frontend_route_table_ids = ["rtb-front-public-a", "rtb-front-public-b", "rtb-fro
 
 assume_existing_vpc_routing = true
 
+database_mode = "rds"
+
 backend_instance_type = "g6e.2xlarge"
 asg_min_size          = 1
 asg_desired_capacity  = 1
 asg_max_size          = 3
+
+# Use these only when database_mode = "ec2_postgres".
+# postgres_ec2_instance_type = "t3.small"
+# postgres_ec2_volume_size   = 40
 
 backend_ami_id         = "ami-0123456789abcdef0"
 model_ebs_snapshot_id  = "snap-0123456789abcdef0"

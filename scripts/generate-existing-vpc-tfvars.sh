@@ -69,9 +69,9 @@ format_array() {
 
 FRONTEND_PUBLIC_SUBNETS="$(jq -r '.summary.public_subnet_ids' <<<"${FRONTEND_JSON}" | format_array)"
 FRONTEND_PRIVATE_SUBNETS="$(jq -r '.summary.private_subnet_ids' <<<"${FRONTEND_JSON}" | format_array)"
-FRONTEND_ROUTE_TABLES="$(jq -r '.summary.route_table_ids' <<<"${FRONTEND_JSON}" | format_array)"
+FRONTEND_ROUTE_TABLES="$(jq -r '(.summary.public_route_table_ids + .summary.private_route_table_ids) | unique' <<<"${FRONTEND_JSON}" | format_array)"
 BACKEND_PRIVATE_SUBNETS="$(jq -r '.summary.private_subnet_ids' <<<"${BACKEND_JSON}" | format_array)"
-BACKEND_ROUTE_TABLES="$(jq -r '.summary.route_table_ids' <<<"${BACKEND_JSON}" | format_array)"
+BACKEND_ROUTE_TABLES="$(jq -r '.summary.private_route_table_ids' <<<"${BACKEND_JSON}" | format_array)"
 
 if [[ -n "${ROUTE53_ZONE_ID}" ]]; then
   ROUTE53_ZONE_LITERAL="\"${ROUTE53_ZONE_ID}\""
@@ -98,6 +98,12 @@ backend_private_subnet_ids = [${BACKEND_PRIVATE_SUBNETS}]
 backend_route_table_ids    = [${BACKEND_ROUTE_TABLES}]
 
 assume_existing_vpc_routing = true
+
+database_mode = "rds"
+
+# Use these only when database_mode = "ec2_postgres".
+# postgres_ec2_instance_type = "t3.small"
+# postgres_ec2_volume_size   = 40
 
 # Fill these in after AMI and model preparation.
 backend_ami_id        = "ami-REPLACE_ME"

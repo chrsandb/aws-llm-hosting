@@ -2,6 +2,15 @@
 
 This runbook owns post-deploy operations. Use it after the platform has already been created.
 
+## Database Modes
+
+The platform supports two PostgreSQL deployment modes:
+
+- `database_mode = "rds"` for the default managed RDS path
+- `database_mode = "ec2_postgres"` for a private single-node PostgreSQL EC2 fallback when managed RDS creation is blocked
+
+Both modes publish the same Postgres secret contract to LiteLLM. Normal `make destroy` preserves that secret for a later re-apply, while the full cleanup flow deletes it.
+
 ## Roll Backend Instances
 
 Start an ASG refresh:
@@ -21,13 +30,21 @@ You can also roll instances by changing launch template inputs and re-running Te
 
 ## Cleanup
 
+For a normal Terraform teardown that preserves the Postgres secret for a later re-apply:
+
+```bash
+make destroy TFVARS=examples/generated.prod.tfvars
+```
+
+That wrapper removes the Terraform-managed Postgres secret resources from state before destroy, so the secret container remains in Secrets Manager and the next apply can reuse it.
+
 Use the safe cleanup wrapper instead of a raw destroy when you want to remove the deployment:
 
 ```bash
 ./scripts/cleanup-deployment.sh --tfvars examples/generated.prod.tfvars
 ```
 
-By default, if `packer/manifest.json` exists, the cleanup script also deregisters the latest locally built Packer AMI from that manifest, deletes its backing snapshot(s), and removes temporary Packer build security groups tagged by `prepare-packer-build.sh`.
+By default, if `packer/manifest.json` exists, the cleanup script also deregisters the latest locally built Packer AMI from that manifest, deletes its backing snapshot(s), removes temporary Packer build security groups tagged by `prepare-packer-build.sh`, and deletes the Postgres secret container.
 
 Key safeguards:
 

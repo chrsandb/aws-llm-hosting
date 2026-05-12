@@ -18,7 +18,7 @@ Main components:
 - ECS Fargate frontend
 - Internal backend ALB
 - Auto Scaling Group of private GPU instances
-- `llama.cpp` CUDA server for `unsloth/Qwen3.5-35B-A3B-GGUF:Q8_0`
+- `llama.cpp` CUDA server for `unsloth/Qwen3.6-35B-A3B-GGUF:Q8_0`
 
 The default target is `eu-north-1` and the baseline shape is one private `g6e.2xlarge` backend instance, suitable for roughly 10 developers with configurable scale-out.
 
@@ -34,7 +34,7 @@ flowchart LR
   PublicALB --> LiteLLM[LiteLLM on ECS Fargate]
   Admin[VPN / Admin CIDRs] --> AdminALB[Internal Admin ALB]
   AdminALB --> LiteLLM
-  LiteLLM --> Postgres[(RDS PostgreSQL)]
+  LiteLLM --> Postgres[(Metadata PostgreSQL)]
   LiteLLM --> Redis[(Optional Redis)]
   LiteLLM --> BackendALB[Internal Backend ALB]
   BackendALB --> ASG[Private GPU ASG]
@@ -61,7 +61,8 @@ For deeper design rationale and network assumptions, see [docs/architecture.md](
 
 Prerequisites:
 
-- AWS account with permissions for Route53, ACM, ECS, EC2, Auto Scaling, ELBv2, IAM, CloudWatch, RDS, Secrets Manager, and SSM
+- AWS account with permissions for Route53, ACM, ECS, EC2, Auto Scaling, ELBv2, IAM, CloudWatch, Secrets Manager, and SSM
+  - include RDS permissions when `database_mode = "rds"`
 - Existing VPCs and subnet IDs for:
   - frontend public subnets
   - frontend private subnets
@@ -204,6 +205,11 @@ Purpose: create a deployment config that includes your existing VPC inputs and k
 
 Success signal: `examples/generated.prod.tfvars` exists and contains your VPC, subnet, route table, and domain inputs.
 
+The generated route table lists follow the selected subnet roles:
+
+- `frontend_route_table_ids` includes the route tables associated with the generated frontend public and frontend private subnets
+- `backend_route_table_ids` includes only the route tables associated with the generated backend private subnets
+
 More detail: [docs/aws-cli-workflow.md](docs/aws-cli-workflow.md).
 
 ### 7. Create the LiteLLM master key if Terraform will not generate it
@@ -324,9 +330,25 @@ Fill in at least:
 
 - `backend_ami_id`
 - `model_ebs_snapshot_id`
+- `database_mode`
 - `route53_zone_id` or `create_route53_zone = true`
 - `admin_allowed_cidrs`
 - any environment-specific overrides
+
+Database mode guidance:
+
+- `database_mode = "rds"` keeps the default managed PostgreSQL path
+- `database_mode = "ec2_postgres"` provisions a small private PostgreSQL EC2 host instead, which is useful when your account or org blocks `rds:CreateDBInstance`
+- if you choose `ec2_postgres`, ensure `frontend_private_subnet_ids` is populated (the EC2 host is private-only and defaults to the first frontend private subnet)
+- if you choose `ec2_postgres`, review or override:
+  - `postgres_ec2_instance_type`
+  - `postgres_ec2_ami_id` (optional; defaults to latest Ubuntu 24.04 x86_64 via SSM public parameter)
+  - `postgres_ec2_subnet_id` (optional subnet override)
+  - `postgres_ec2_volume_size`
+  - `postgres_ec2_volume_type`
+  - `postgres_ec2_volume_iops`
+  - `postgres_ec2_volume_throughput`
+- `ec2_postgres` is a single-node fallback path (private, SSM-first) and does not provide managed RDS HA behavior
 
 If you want a quick suggestion for `admin_allowed_cidrs`, run:
 
@@ -422,6 +444,11 @@ Use this as the quick index for later tasks.
 | Clean up safely | `make cleanup` or `cleanup-deployment.sh` (also removes Packer AMIs from `packer/manifest.json` and tagged Packer build SGs by default) | [docs/operations.md](docs/operations.md) |
 | Use SSM or optionally SSH | `aws ssm start-session` | [docs/operations.md](docs/operations.md) |
 | Validate and format | `make fmt`, `make validate` | [docs/operations.md](docs/operations.md) |
+
+For teardown:
+
+- `make destroy` preserves the Postgres secret in Secrets Manager for a later re-apply
+- `make cleanup` performs the fuller cleanup path and also deletes the Postgres secret container
 
 ## Troubleshooting
 

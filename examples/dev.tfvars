@@ -17,6 +17,8 @@ frontend_route_table_ids = ["rtb-front-public-a", "rtb-front-public-b", "rtb-fro
 
 assume_existing_vpc_routing = true
 
+database_mode = "ec2_postgres"
+
 backend_ami_id         = "ami-0123456789abcdef0"
 model_ebs_snapshot_id  = "snap-0123456789abcdef0"
 model_source           = "ebs_snapshot"
@@ -26,6 +28,9 @@ model_alias            = "qwen3.6-35b-a3b"
 model_path             = "/models/Qwen3.6-35B-A3B-Q8_0.gguf"
 llama_cpp_image        = "ghcr.io/ggerganov/llama.cpp"
 llama_cpp_image_tag    = "server-cuda"
+
+postgres_ec2_instance_type = "t3.small"
+postgres_ec2_volume_size   = 40
 
 admin_allowed_cidrs = ["10.0.0.0/8"]
 

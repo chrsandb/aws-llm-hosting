@@ -134,9 +134,21 @@ derive_snapshot_description() {
   local filename="$2"
   local repo_part=""
   local file_part=""
+  local repo_base=""
+  local file_base=""
+  local repo_prefix=""
 
-  repo_part="$(slugify "${repo##*/}")"
-  file_part="$(slugify "${filename%.gguf}")"
+  repo_base="${repo##*/}"
+  repo_base="${repo_base%-GGUF}"
+  file_base="${filename%.gguf}"
+  repo_prefix="${repo_base}-"
+
+  if [[ "${file_base}" == "${repo_prefix}"* ]]; then
+    file_base="${file_base#"${repo_prefix}"}"
+  fi
+
+  repo_part="$(slugify "${repo_base}")"
+  file_part="$(slugify "${file_base}")"
 
   if [[ -n "${repo_part}" && -n "${file_part}" ]]; then
     printf '%s-%s-model-snapshot' "${repo_part}" "${file_part}"

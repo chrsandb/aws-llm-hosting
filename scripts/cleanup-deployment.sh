@@ -57,6 +57,7 @@ DELETE_AMI_IDS=()
 DELETE_SNAPSHOT_IDS=()
 DELETE_VOLUME_IDS=()
 DELETE_SECURITY_GROUP_IDS=()
+DELETE_SECRET_NAMES=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -88,6 +89,12 @@ if [[ ! -f "${TFVARS}" ]]; then
 fi
 
 TFVARS_ABS="$(cd "$(dirname "${TFVARS}")" && pwd)/$(basename "${TFVARS}")"
+
+parse_tfvars_string() {
+  local key="$1"
+  local path="$2"
+  sed -nE "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*\"([^\"]+)\"([[:space:]]*#.*)?$/\\1/p" "${path}" | head -n1
+}
 
 for cmd in terraform aws; do
   command -v "${cmd}" >/dev/null 2>&1 || {
@@ -180,6 +187,12 @@ for security_group_id in "${PACKER_DISCOVERED_SECURITY_GROUP_IDS[@]}"; do
   append_unique "${security_group_id}" DELETE_SECURITY_GROUP_IDS
 done
 
+PROJECT_NAME="$(parse_tfvars_string "project_name" "${TFVARS}")"
+ENVIRONMENT="$(parse_tfvars_string "environment" "${TFVARS}")"
+if [[ -n "${PROJECT_NAME}" && -n "${ENVIRONMENT}" ]]; then
+  append_unique "${PROJECT_NAME}-${ENVIRONMENT}/litellm/postgres" DELETE_SECRET_NAMES
+fi
+
 echo "Initializing Terraform in ${TERRAFORM_DIR}..."
 terraform -chdir="${TERRAFORM_DIR}" init >/dev/null
 
@@ -220,6 +233,9 @@ fi
 if [[ "${#DELETE_SECURITY_GROUP_IDS[@]}" -gt 0 ]]; then
   printf '  - Delete Packer build security groups: %s\n' "${DELETE_SECURITY_GROUP_IDS[*]}"
 fi
+if [[ "${#DELETE_SECRET_NAMES[@]}" -gt 0 ]]; then
+  printf '  - Delete Secrets Manager secrets: %s\n' "${DELETE_SECRET_NAMES[*]}"
+fi
 echo "  - Existing VPCs/subnets/route tables/hosted zones not tracked in Terraform state will not be touched."
 if [[ "${SKIP_PACKER_ARTIFACTS}" != "true" && -f "${PACKER_MANIFEST}" ]]; then
   echo "  - Reusable Packer instance profiles are not deleted automatically."
@@ -256,6 +272,11 @@ done
 for security_group_id in "${DELETE_SECURITY_GROUP_IDS[@]}"; do
   echo "Deleting security group ${security_group_id}..."
   aws "${AWS_ARGS[@]}" ec2 delete-security-group --group-id "${security_group_id}" || true
+done
+
+for secret_name in "${DELETE_SECRET_NAMES[@]}"; do
+  echo "Deleting secret ${secret_name}..."
+  aws "${AWS_ARGS[@]}" secretsmanager delete-secret --secret-id "${secret_name}" --force-delete-without-recovery || true
 done
 
 echo
